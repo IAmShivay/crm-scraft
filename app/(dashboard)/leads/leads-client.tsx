@@ -42,21 +42,8 @@ import {
 } from "@/components/ui/table";
 import { CRM_MESSAGES } from "@/lib/constant/crm";
 import { useAppSelector } from "@/lib/store/hooks"; // Assuming the typed hook is here
-import {
-  useAssignRoleMutation,
-  useBulkDeleteLeadsMutation,
-  useCreateLeadMutation,
-  useCreateManyLeadMutation,
-  useGetLeadsByWorkspaceQuery,
-  useUpdateLeadDataMutation,
-  useUpdateLeadMutation,
-} from "@/lib/store/services/leadsApi";
-import { useGetStatusQuery } from "@/lib/store/services/status";
-import { useGetWebhooksQuery } from "@/lib/store/services/webhooks";
-import {
-  useGetActiveWorkspaceQuery,
-  useGetWorkspaceMembersQuery,
-} from "@/lib/store/services/workspace";
+import { supabase } from "@/lib/supabaseClient";
+import { LeadsSkeleton } from "./leads-skeleton";
 import { formatDate } from "@/utils/date";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -119,14 +106,11 @@ const LeadManagement = () => {
   const isCollapsed = useAppSelector((state) => state.sidebar.isCollapsed);
   const { formatDate: formatWorkspaceDate } = useWorkspace();
 
-  const [createLead, { isLoading: isCreateLoading }] = useCreateLeadMutation();
-  const [createManyLead, { isLoading: isCreateManyLoading }] =
-    useCreateManyLeadMutation();
-  const [updateLeadData, { isLoading: isUpdateLoading }] =
-    useUpdateLeadDataMutation();
-  const [updateLead] = useUpdateLeadMutation();
-  const [assignRole, { isLoading: isAssignLoading }] = useAssignRoleMutation();
-  const [deleteLeadsData] = useBulkDeleteLeadsMutation();
+  // Loading states for direct Supabase calls
+  const [isCreateLoading, setIsCreateLoading] = useState(false);
+  const [isCreateManyLoading, setIsCreateManyLoading] = useState(false);
+  const [isUpdateLoading, setIsUpdateLoading] = useState(false);
+  const [isAssignLoading, setIsAssignLoading] = useState(false);
 
   // State hooks
   const [searchQuery, setSearchQuery] = useState("");
@@ -144,32 +128,227 @@ const LeadManagement = () => {
 
   const router = useRouter();
 
-  const {
-    data: activeWorkspace,
-    isLoading: isLoadingWorkspace,
-    refetch: refetchWorkspace,
-  } = useGetActiveWorkspaceQuery<any>(undefined);
-  const workspaceId = activeWorkspace?.data?.id;
+  // State for data - direct Supabase calls
+  const [activeWorkspace, setActiveWorkspace] = useState<any>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceData, setWorkspaceData] = useState<any>(null);
+  const [leadSources, setLeadSources] = useState<any>(null);
+  const [workspaceMembers, setWorkspaceMembers] = useState<any>(null);
+  const [statusData, setStatusData] = useState<any>(null);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+  const [isLoadingLeads, setIsLoadingLeads] = useState(true);
+  const [isLoadingSources, setIsLoadingSources] = useState(true);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
   const workspaceChangeCounter = useAppSelector(
     (state) => state.sidebar.workspaceChangeCounter
   );
   const prevWorkspaceChangeCounterRef = useRef(workspaceChangeCounter);
 
+  // Direct Supabase functions - copied from API routes
+  const fetchActiveWorkspace = async () => {
+    try {
+      setIsLoadingWorkspace(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsLoadingWorkspace(false);
+        return;
+      }
+
+      let { data: activeWorkspaceData, error: activeError } = await supabase
+        .from("workspace_members")
+        .select(`
+          workspace_id,
+          role,
+          is_active,
+          workspaces (*)
+        `)
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .eq("status", "accepted")
+        .single();
+
+      if (!activeWorkspaceData || activeError) {
+        const { data: firstWorkspace, error: firstError } = await supabase
+          .from("workspace_members")
+          .select(`
+            id,
+            workspace_id,
+            role,
+            workspaces (*)
+          `)
+          .eq("user_id", user.id)
+          .eq("status", "accepted")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .single();
+
+        if (firstError || !firstWorkspace) {
+          console.error("No workspaces found for user");
+          setIsLoadingWorkspace(false);
+          return;
+        }
+
+        activeWorkspaceData = {
+          ...firstWorkspace,
+          is_active: true
+        };
+      }
+
+      const workspaceResponse = {
+        data: {
+          ...activeWorkspaceData.workspaces,
+          role: activeWorkspaceData.role,
+          is_active: true,
+        },
+      };
+
+      setActiveWorkspace(workspaceResponse);
+      setWorkspaceId(activeWorkspaceData.workspace_id?.toString() || null);
+    } catch (error) {
+      console.error('Error fetching active workspace:', error);
+    } finally {
+      setIsLoadingWorkspace(false);
+    }
+  };
+
+  const fetchLeadsByWorkspace = useCallback(async (wsId: string) => {
+    if (!wsId) return;
+
+    try {
+      setIsLoadingLeads(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsLoadingLeads(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("work_id", wsId);
+
+      if (error) {
+        console.error('Error fetching leads:', error);
+        setIsLoadingLeads(false);
+        return;
+      }
+
+      setWorkspaceData({ data: data || [] });
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    } finally {
+      setIsLoadingLeads(false);
+    }
+  }, []);
+
+  const fetchWebhooks = async (wsId: string) => {
+    if (!wsId) return;
+
+    try {
+      setIsLoadingSources(true);
+      const { data, error } = await supabase
+        .from('webhooks')
+        .select('*')
+        .eq('workspace_id', wsId);
+
+      if (error) {
+        console.error('Error fetching webhooks:', error);
+        setIsLoadingSources(false);
+        return;
+      }
+
+      setLeadSources({ data: data || [] });
+    } catch (error) {
+      console.error('Error fetching webhooks:', error);
+    } finally {
+      setIsLoadingSources(false);
+    }
+  };
+
+  const fetchWorkspaceMembers = useCallback(async (wsId: string) => {
+    if (!wsId) return;
+
+    try {
+      setIsLoadingMembers(true);
+
+      // Get workspace members - exactly like original API
+      const { data, error } = await supabase
+        .from("workspace_members")
+        .select("*")
+        .eq("workspace_id", wsId);
+
+      if (error) {
+        console.error('Error fetching workspace members:', error);
+        setIsLoadingMembers(false);
+        return;
+      }
+
+      // Process members to add name field for dropdown compatibility
+      // The original system likely used email as the display name
+      const processedMembers = (data || []).map((member: any) => ({
+        ...member,
+        name: member.email?.split('@')[0] || 'Unknown User'
+      }));
+
+      console.log('Fetched workspace members:', processedMembers);
+      setWorkspaceMembers({ data: processedMembers });
+    } catch (error) {
+      console.error('Error fetching workspace members:', error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  }, []);
+
+  const fetchStatus = useCallback(async (wsId: string) => {
+    if (!wsId) return;
+
+    try {
+      setIsLoadingStatus(true);
+      const { data, error } = await supabase
+        .from('status')
+        .select('*')
+        .eq('workspace_id', wsId);
+
+      if (error) {
+        console.error('Error fetching status:', error);
+        setIsLoadingStatus(false);
+        return;
+      }
+
+      console.log('Fetched status data:', data);
+      setStatusData({ data: data || [] });
+    } catch (error) {
+      console.error('Error fetching status:', error);
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  }, []);
+
+  // Initialize data fetching
+  useEffect(() => {
+    fetchActiveWorkspace();
+  }, []);
+
+  // Fetch workspace-dependent data when workspaceId changes
+  useEffect(() => {
+    if (workspaceId) {
+      fetchLeadsByWorkspace(workspaceId);
+      fetchWebhooks(workspaceId);
+      fetchWorkspaceMembers(workspaceId);
+      fetchStatus(workspaceId);
+    }
+  }, [workspaceId, fetchLeadsByWorkspace, fetchStatus, fetchWorkspaceMembers]);
+
   useEffect(() => {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
       console.log("Workspace changed in Redux, refetching leads data...");
 
-      refetchWorkspace();
-      if (workspaceId) {
-        refetchLeads();
-        refetchSources();
-        refetchMembers();
-        refetchStatus();
-      }
+      fetchActiveWorkspace();
     }
-  }, [workspaceChangeCounter, refetchWorkspace, workspaceId]);
+  }, [workspaceChangeCounter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -186,100 +365,122 @@ const LeadManagement = () => {
     []
   );
 
-  const {
-    data: leadSources,
-    isLoading: isLoadingSources,
-    refetch: refetchSources,
-  } = useGetWebhooksQuery<any>(workspaceId ? { id: workspaceId } : skipToken);
-
-  const {
-    data: workspaceData,
-    isLoading: isLoadingLeads,
-    refetch: refetchLeads,
-  } = useGetLeadsByWorkspaceQuery<any>(
-    workspaceId ? { workspaceId: workspaceId.toString() } : skipToken,
-    {
-      skip: !workspaceId || isLoadingWorkspace,
-      pollingInterval: 30000, 
-      refetchOnMountOrArgChange: true,
-    }
-  );
-
-  const {
-    data: workspaceMembers,
-    isLoading: isLoadingMembers,
-    refetch: refetchMembers,
-  } = useGetWorkspaceMembersQuery<any>(workspaceId ? workspaceId : skipToken, {
-    skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
-  });
-
-  const {
-    data: statusData,
-    isLoading: isLoadingStatus,
-    refetch: refetchStatus,
-  } = useGetStatusQuery<any>(workspaceId ? workspaceId : skipToken, {
-    skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
-  });
-
+  // Set up polling for real-time updates
   useEffect(() => {
-    if (!isLoadingLeads && workspaceData) {
-      const processLeads = () => {
-        const leadsArray: any[] = Array.isArray((workspaceData as any)?.data)
-          ? (workspaceData as any).data
-          : [];
-        let fetchedLeads = leadsArray.map((lead: any, index: any) => ({
-          id: lead.id || index + 1,
-          Name: lead.name || "",
-          email: lead.email || "",
-          phone: lead.phone || "",
-          company: lead.company || "",
-          position: lead.position || "",
-          contact_method: lead.contact_method,
-          owner: lead.owner || "Unknown",
-          status: lead.status || "New",
-          revenue: lead.revenue || 0,
-          assign_to: lead.assign_to || "Not Assigned",
-          createdAt: lead.created_at
-            ? new Date(lead.created_at).toISOString()
-            : new Date().toISOString(),
-          isDuplicate: false,
-          is_email_valid: lead.is_email_valid,
-          is_phone_valid: lead.is_phone_valid,
-          sourceId: lead.lead_source_id || null,
-          custom_data: lead.custom_data || {},
-        }));
+    if (!workspaceId) return;
 
-        const duplicates = new Set();
-        fetchedLeads.forEach((lead: any) => {
-          const duplicate = fetchedLeads.find(
-            (l: any) =>
-              l.id !== lead.id &&
-              (l.email === lead.email || l.phone === lead.phone)
-          );
-          if (duplicate) {
-            duplicates.add(lead.id);
-            duplicates.add(duplicate.id);
-          }
-        });
+    const pollInterval = setInterval(() => {
+      console.log('Polling for leads updates...');
+      fetchLeadsByWorkspace(workspaceId);
+    }, 30000); // Poll every 30 seconds
 
-        const updatedLeads = fetchedLeads.map((lead: any) => ({
-          ...lead,
-          isDuplicate: duplicates.has(lead.id),
-        }));
+    return () => clearInterval(pollInterval);
+  }, [workspaceId, fetchLeadsByWorkspace]);
 
-        setLeads(
-          updatedLeads.sort(
-            (a: any, b: any) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-        );
-      };
-
-      processLeads();
+  // Memoized leads processing for better performance
+  const processedLeads = useMemo(() => {
+    if (isLoadingLeads || !workspaceData?.data) {
+      return [];
     }
+
+    console.log('Processing leads data:', workspaceData.data);
+
+    const leadsArray: any[] = Array.isArray(workspaceData.data) ? workspaceData.data : [];
+
+    // Map leads with proper status structure
+    let fetchedLeads = leadsArray.map((lead: any, index: any) => ({
+      id: lead.id || index + 1,
+      Name: lead.name || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      company: lead.company || "",
+      position: lead.position || "",
+      contact_method: lead.contact_method,
+      owner: lead.owner || "Unknown",
+      // Fix status structure - ensure it's an object with name and color
+      status: typeof lead.status === 'string'
+        ? { name: lead.status, color: "#ea1212" }
+        : lead.status || { name: "New", color: "#ea1212" },
+      revenue: lead.revenue || 0,
+      assign_to: lead.assign_to || "Not Assigned",
+      createdAt: lead.created_at
+        ? new Date(lead.created_at).toISOString()
+        : new Date().toISOString(),
+      isDuplicate: false,
+      is_email_valid: lead.is_email_valid,
+      is_phone_valid: lead.is_phone_valid,
+      sourceId: lead.lead_source_id || null,
+      custom_data: lead.custom_data || {},
+    }));
+
+    // Optimized duplicate detection using Map for O(n) complexity
+    const emailMap = new Map();
+    const phoneMap = new Map();
+    const duplicateIds = new Set();
+
+    fetchedLeads.forEach((lead: any) => {
+      if (lead.email) {
+        if (emailMap.has(lead.email)) {
+          duplicateIds.add(lead.id);
+          duplicateIds.add(emailMap.get(lead.email));
+        } else {
+          emailMap.set(lead.email, lead.id);
+        }
+      }
+
+      if (lead.phone) {
+        if (phoneMap.has(lead.phone)) {
+          duplicateIds.add(lead.id);
+          duplicateIds.add(phoneMap.get(lead.phone));
+        } else {
+          phoneMap.set(lead.phone, lead.id);
+        }
+      }
+    });
+
+    // Mark duplicates and sort
+    const updatedLeads = fetchedLeads.map((lead: any) => ({
+      ...lead,
+      isDuplicate: duplicateIds.has(lead.id),
+    }));
+
+    return updatedLeads.sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [workspaceData, isLoadingLeads]);
+
+  // Update leads state when processed leads change
+  useEffect(() => {
+    setLeads(processedLeads);
+  }, [processedLeads]);
+
+  // Debug effect to monitor status data
+  useEffect(() => {
+    console.log('Status data updated:', {
+      statusData,
+      hasData: !!statusData?.data,
+      dataLength: statusData?.data?.length,
+      isLoadingStatus,
+      sampleStatus: statusData?.data?.[0]
+    });
+  }, [statusData, isLoadingStatus]);
+
+  // Memoized status options for better performance
+  const statusOptions = useMemo(() => {
+    if (statusData?.data && Array.isArray(statusData.data) && statusData.data.length > 0) {
+      return statusData.data;
+    }
+    // Fallback status options
+    return [
+      { name: "New", color: "#3b82f6" },
+      { name: "Qualified", color: "#10b981" },
+      { name: "Proposal", color: "#f59e0b" },
+      { name: "Negotiation", color: "#8b5cf6" },
+      { name: "Closed Won", color: "#059669" },
+      { name: "Closed Lost", color: "#dc2626" }
+    ];
+  }, [statusData]);
 
   const filteredLeads = useMemo(() => {
     if (!leads.length) return [];
@@ -421,11 +622,197 @@ const LeadManagement = () => {
     [form, resetDialog]
   );
 
+  // Direct Supabase functions for CRUD operations
+  const createLeadDirect = async (leadData: any) => {
+    try {
+      setIsCreateLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .insert([{
+          ...leadData,
+          work_id: workspaceId,
+          created_by: user.id
+        }])
+        .select();
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error creating lead:', error);
+      return { data: null, error: error.message };
+    } finally {
+      setIsCreateLoading(false);
+    }
+  };
+
+  const updateLeadDataDirect = async (updateData: { id: string; leads: any }) => {
+    try {
+      setIsUpdateLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .update(updateData.leads)
+        .eq("id", updateData.id)
+        .select();
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error updating lead:', error);
+      throw error;
+    } finally {
+      setIsUpdateLoading(false);
+    }
+  };
+
+  const deleteLeadsDataDirect = async (deleteData: { id: string[]; workspaceId: string }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .delete()
+        .in("id", deleteData.id)
+        .eq("work_id", deleteData.workspaceId);
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error deleting leads:', error);
+      throw error;
+    }
+  };
+
+  const createManyLeadDirect = useCallback(async (data: { workspaceId: string; body: any[] }) => {
+    try {
+      setIsCreateManyLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const leadsToInsert = data.body.map(lead => ({
+        ...lead,
+        work_id: data.workspaceId,
+        created_by: user.id
+      }));
+
+      const { data: insertedData, error } = await supabase
+        .from("leads")
+        .insert(leadsToInsert)
+        .select();
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data: insertedData, error: null };
+    } catch (error: any) {
+      console.error('Error creating many leads:', error);
+      throw error;
+    } finally {
+      setIsCreateManyLoading(false);
+    }
+  }, [workspaceId, fetchLeadsByWorkspace]);
+
+  const updateLeadDirect = useCallback(async (updateData: { id: string; leads: any }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .update(updateData.leads)
+        .eq("id", updateData.id)
+        .select();
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error updating lead:', error);
+      throw error;
+    }
+  }, [workspaceId, fetchLeadsByWorkspace]);
+
+  const assignRoleDirect = useCallback(async (assignData: { id: string; data: { name: string; role: string } }) => {
+    try {
+      setIsAssignLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Unauthorized");
+      }
+
+      const { data, error } = await supabase
+        .from("leads")
+        .update({
+          assign_to: assignData.data.name,
+          assigned_role: assignData.data.role
+        })
+        .eq("id", assignData.id)
+        .select();
+
+      if (error) throw error;
+
+      // Refresh leads data
+      if (workspaceId) {
+        await fetchLeadsByWorkspace(workspaceId);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error assigning lead:', error);
+      throw error;
+    } finally {
+      setIsAssignLoading(false);
+    }
+  }, [workspaceId, fetchLeadsByWorkspace]);
+
   // Handle form submission
   const onSubmit = async (data: any) => {
     if (dialogMode === "create") {
       try {
-        const response = await createLead({ ...data, workspaceId }).unwrap();
+        const response = await createLeadDirect({ ...data, workspaceId });
 
         if (response.error) {
           let errorMessage = "An unexpected error occurred.";
@@ -459,7 +846,7 @@ const LeadManagement = () => {
     } else if (dialogMode === "edit" && editingLead) {
       // Update existing lead
       try {
-        await updateLeadData({ id: editingLead.id, leads: data });
+        await updateLeadDataDirect({ id: editingLead.id, leads: data });
         // Let RTK Query handle the data update
         toast.success(CRM_MESSAGES.LEAD_UPDATED_SUCCESS);
       } catch (error: any) {
@@ -486,10 +873,15 @@ const LeadManagement = () => {
   // Delete selected leads
   const handleDelete = async () => {
     try {
-      await deleteLeadsData({
+      if (!workspaceId) {
+        toast.error("No workspace selected");
+        return;
+      }
+
+      await deleteLeadsDataDirect({
         id: selectedLeads,
         workspaceId: workspaceId,
-      }).unwrap();
+      });
 
       // Let RTK Query handle the data update
       setSelectedLeads([]);
@@ -717,7 +1109,12 @@ const LeadManagement = () => {
               }
 
               try {
-                await createManyLead({
+                if (!workspaceId) {
+                  toast.error("No workspace selected");
+                  return;
+                }
+
+                await createManyLeadDirect({
                   workspaceId,
                   body: validLeads,
                 });
@@ -740,7 +1137,7 @@ const LeadManagement = () => {
 
       reader.readAsText(file);
     },
-    [workspaceId, createManyLead]
+    [workspaceId, createManyLeadDirect]
   );
 
   // Handle view
@@ -775,7 +1172,7 @@ const LeadManagement = () => {
       const { name, color } = JSON.parse(value);
 
       try {
-        await updateLead({ id, leads: { status: { name, color } } });
+        await updateLeadDirect({ id, leads: { status: { name, color } } });
         // Let RTK Query handle the data update
         toast.success(`Lead status updated to ${name}`);
       } catch (error: any) {
@@ -783,7 +1180,7 @@ const LeadManagement = () => {
         toast.error("Failed to update lead status");
       }
     },
-    [updateLead]
+    [updateLeadDirect]
   );
 
   const handleAssignChange = useCallback(
@@ -791,13 +1188,13 @@ const LeadManagement = () => {
       const { name, role } = JSON.parse(assign);
 
       try {
-        await assignRole({ id, data: { name, role } } as any);
+        await assignRoleDirect({ id, data: { name, role } });
         toast.success(`Lead assigned to ${name}`);
       } catch (error: any) {
         toast.error("Failed to assign lead");
       }
     },
-    [assignRole]
+    [assignRoleDirect]
   );
 
   const handleGoBack = useCallback(() => {
@@ -826,8 +1223,18 @@ const LeadManagement = () => {
       </div>
     );
   }
-  // Loading state is handled by Suspense boundary with LeadsSkeleton
-  if (isLoadingStatus || isLoadingLeads || isLoadingMembers) return null;
+  // Loading state with proper skeleton that adapts to collapsed state
+  if (isLoadingStatus || isLoadingLeads || isLoadingMembers) {
+    return (
+      <div
+        className={`transition-all duration-500 ease-in-out md:px-4 md:py-6 py-2 px-2 ${
+          isCollapsed ? "md:ml-[80px]" : "md:ml-[250px]"
+        } w-auto overflow-hidden`}
+      >
+        <LeadsSkeleton />
+      </div>
+    );
+  }
   return (
     <div
       className={`transition-all duration-500 ease-in-out md:px-4 md:py-6 py-2 px-2 ${
@@ -1205,16 +1612,21 @@ const LeadManagement = () => {
                             </SelectTrigger>
 
                             <SelectContent className="overflow-hidden rounded-xl border-0 bg-white p-2 shadow-2xl dark:bg-gray-800">
-                              {(statusData as any)?.data.map(
-                                (status: { name: string; color: string }) => (
-                                  <SelectItem
-                                    key={status.name}
-                                    value={JSON.stringify({
-                                      name: status?.name,
-                                      color: status?.color,
-                                    })}
-                                    className="cursor-pointer rounded-lg outline-none transition-colors focus:bg-transparent"
-                                  >
+                              {isLoadingStatus ? (
+                                <div className="p-4 text-center text-sm text-gray-500">
+                                  Loading status options...
+                                </div>
+                              ) : (
+                                statusOptions.map(
+                                  (status: { name: string; color: string }) => (
+                                    <SelectItem
+                                      key={status.name}
+                                      value={JSON.stringify({
+                                        name: status?.name,
+                                        color: status?.color,
+                                      })}
+                                      className="cursor-pointer rounded-lg outline-none transition-colors focus:bg-transparent"
+                                    >
                                     <div className="group flex items-center gap-3 rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                       <div className="relative">
                                         {/* Glow effect */}
@@ -1237,6 +1649,7 @@ const LeadManagement = () => {
                                       </span>
                                     </div>
                                   </SelectItem>
+                                  )
                                 )
                               )}
                             </SelectContent>
@@ -1471,38 +1884,44 @@ const LeadManagement = () => {
                         </SelectTrigger>
 
                         <SelectContent className="overflow-hidden rounded-xl border-0 bg-white p-2 shadow-2xl dark:bg-gray-800">
-                          {(statusData as any)?.data.map(
-                            (status: { name: string; color: string }) => (
-                              <SelectItem
-                                key={status.name}
-                                value={JSON.stringify({
-                                  name: status?.name,
-                                  color: status?.color,
-                                })}
-                                className="cursor-pointer rounded-lg outline-none transition-colors focus:bg-transparent"
-                              >
-                                <div className="group flex items-center gap-3 rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                  <div className="relative">
-                                    {/* Glow effect */}
-                                    <div
-                                      className="absolute -inset-1 rounded-lg opacity-20 blur-sm transition-all duration-200 group-hover:opacity-40"
-                                      style={{
-                                        backgroundColor: status?.color,
-                                      }}
-                                    />
-                                    {/* Main dot */}
-                                    <div
-                                      className="relative h-3 w-3 rounded-lg transition-transform duration-200 group-hover:scale-110"
-                                      style={{
-                                        backgroundColor: status?.color,
-                                      }}
-                                    />
+                          {isLoadingStatus ? (
+                            <div className="p-4 text-center text-sm text-gray-500">
+                              Loading status options...
+                            </div>
+                          ) : (
+                            statusOptions.map(
+                              (status: { name: string; color: string }) => (
+                                <SelectItem
+                                  key={status.name}
+                                  value={JSON.stringify({
+                                    name: status?.name,
+                                    color: status?.color,
+                                  })}
+                                  className="cursor-pointer rounded-lg outline-none transition-colors focus:bg-transparent"
+                                >
+                                  <div className="group flex items-center gap-3 rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <div className="relative">
+                                      {/* Glow effect */}
+                                      <div
+                                        className="absolute -inset-1 rounded-lg opacity-20 blur-sm transition-all duration-200 group-hover:opacity-40"
+                                        style={{
+                                          backgroundColor: status?.color,
+                                        }}
+                                      />
+                                      {/* Main dot */}
+                                      <div
+                                        className="relative h-3 w-3 rounded-lg transition-transform duration-200 group-hover:scale-110"
+                                        style={{
+                                          backgroundColor: status?.color,
+                                        }}
+                                      />
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                      {status.name}
+                                    </span>
                                   </div>
-                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {status.name}
-                                  </span>
-                                </div>
-                              </SelectItem>
+                                </SelectItem>
+                              )
                             )
                           )}
                         </SelectContent>

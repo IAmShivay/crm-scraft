@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const coreConfig = {
+const config = {
   reactStrictMode: true,
   compress: true, // Enable response compression
   eslint: {
@@ -19,7 +19,7 @@ const coreConfig = {
   },
   experimental: {
     optimizeCss: true,
-    optimizeServerReact: true, 
+    optimizeServerReact: true,
     turbo: {
       rules: {
         "*.svg": ["@svgr/webpack"],
@@ -27,16 +27,5 @@ const coreConfig = {
     },
   },
 };
-
-const { withSentryConfig } = require("@sentry/nextjs");
-
-const config = withSentryConfig(coreConfig, {
-  org: "scraft-4g",
-  project: "crm-cms",
-  silent: !process.env.CI,
-  widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: true,
-});
 
 module.exports = config;

@@ -27,6 +27,7 @@ import {
   useGetActiveWorkspaceQuery,
   useGetWorkspaceMembersQuery,
 } from "@/lib/store/services/workspace";
+import { skipToken } from "@reduxjs/toolkit/query";
 import {
   ChevronDown,
   ChevronUp,
@@ -90,6 +91,11 @@ export default function ContactPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [leads, setLeads] = useState<any[]>([]);
+
+  // Add state to track data processing
+  const [isProcessingData, setIsProcessingData] = useState(false);
+  const [lastProcessedTimestamp, setLastProcessedTimestamp] = useState<number>(0);
+  const [contactStatuses, setContactStatuses] = useState<Set<string>>(new Set());
   const [editNameId, setEditNameId] = useState(null);
   const [nameInfo, setNameInfo] = useState("");
   const [editEmailId, setEditEmailId] = useState(null);
@@ -170,116 +176,234 @@ export default function ContactPage() {
     status: "Active",
   });
 
-  // fetching leads
-  const { data: activeWorkspace, isLoading: isLoadingWorkspace } =
+  // fetching leads - ORIGINAL REDUX PATTERN with improved error handling
+  const { data: activeWorkspace, isLoading: isLoadingWorkspace, error: workspaceError } =
     useGetActiveWorkspaceQuery<any>(undefined);
+
   const workspaceId = activeWorkspace?.data?.id;
-  const { data: workspaceData, isLoading: isLoadingLeads }: any =
+
+  const { data: workspaceData, isLoading: isLoadingLeads, error: leadsError }: any =
     useGetLeadsByWorkspaceQuery(
       workspaceId
-        ? ({ workspaceId: workspaceId.toString() } as { workspaceId: string }) // Provide workspaceId if it exists
-        : ({} as { workspaceId: string }), // Fallback empty object if workspaceId is undefined
+        ? ({ workspaceId: workspaceId.toString() } as { workspaceId: string })
+        : skipToken,
       {
-        skip: !workspaceId || isLoadingWorkspace, // Skip fetching if workspaceId is missing or loading
-        pollingInterval: 10000, // Poll every 2 seconds (2000 ms)
+        pollingInterval: 10000,
+        // Add retry logic for better reliability
+        refetchOnMountOrArgChange: true,
+        refetchOnReconnect: true,
       }
     );
+
   const { data: workspaceMembers, isLoading: isLoadingMembers } =
-    useGetWorkspaceMembersQuery(workspaceId);
+    useGetWorkspaceMembersQuery(workspaceId ? workspaceId : skipToken);
+
   const { data: tagsData, isLoading: isLoadingTags }: any =
-    useGetTagsQuery(workspaceId);
+    useGetTagsQuery(workspaceId ? workspaceId : skipToken);
 
   const POLLING_INTERVAL = 10000;
-  const { data: statusData, isLoading: isLoadingStatus }: any =
-    useGetStatusQuery(workspaceId);
 
-  // **Filter Leads into Contacts**
-  const contactStatuses = new Set(
-    Array.isArray(statusData?.data)
-      ? statusData.data
-          .filter((status: any) => status.count_statistics)
-          .map((status: any) => status.name)
-      : []
-  );
+  const { data: statusData, isLoading: isLoadingStatus, error: statusError }: any =
+    useGetStatusQuery(workspaceId ? workspaceId : skipToken, {
+      // Ensure status data is fetched reliably
+      refetchOnMountOrArgChange: true,
+    });
+
+  // Add error logging for debugging
+  useEffect(() => {
+    if (workspaceError) console.error('Workspace error:', workspaceError);
+    if (leadsError) console.error('Leads error:', leadsError);
+    if (statusError) console.error('Status error:', statusError);
+  }, [workspaceError, leadsError, statusError]);
 
   const handleView = (id: number) => {
     router.push(`/leads/${id}`);
   };
 
+  // Process leads and contacts with proper dependency management
   useEffect(() => {
-    const fetchLeads = () => {
-      if (!isLoadingLeads && workspaceData?.data) {
-        let fetchedLeads = workspaceData?.data.map(
-          (lead: any, index: number) => ({
-            id: lead.id || index + 1,
-            Name: lead.name || "",
-            email: lead.email || "",
-            phone: lead.phone || "",
-            company: lead.company || "",
-            position: lead.position || "",
-            contact_method: lead.contact_method,
-            owner: lead.owner || "Unknown",
-            status: lead.status || { name: "New" },
-            revenue: lead.revenue || 0,
-            assign_to: lead.assign_to || "Not Assigned",
-            createdAt: lead.created_at
-              ? new Date(lead.created_at).toISOString()
-              : new Date().toISOString(),
-            isDuplicate: false,
-            is_email_valid: lead.is_email_valid,
-            is_phone_valid: lead.is_phone_valid,
-            sourceId: lead?.lead_source_id ?? null,
-            businessInfo: lead?.businessInfo ?? "",
-            tag: lead?.tags ?? {},
-            address: lead?.address ?? "",
-          })
-        );
-
-        const duplicates = new Set();
-        fetchedLeads.forEach((lead: any) => {
-          const duplicate = fetchedLeads.find(
-            (l: any) =>
-              l.id !== lead.id &&
-              (l.email === lead.email || l.phone === lead.phone)
-          );
-          if (duplicate) {
-            duplicates.add(lead.id);
-            duplicates.add(duplicate.id);
-          }
+    const processLeadsAndContacts = () => {
+      // Enhanced loading checks
+      if (isLoadingLeads || isLoadingStatus || isLoadingWorkspace) {
+        console.log('Still loading data:', {
+          isLoadingLeads,
+          isLoadingStatus,
+          isLoadingWorkspace,
+          hasWorkspaceData: !!workspaceData?.data,
+          hasStatusData: !!statusData?.data
         });
-
-        // Mark duplicates
-        const updatedLeads = fetchedLeads.map((lead: any) => ({
-          ...lead,
-          isDuplicate: duplicates.has(lead.id),
-        }));
-
-        // Sort by most recent
-        const sortedLeads = updatedLeads.sort(
-          (a: any, b: any) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-
-        setLeads(sortedLeads);
-
-        // Filter leads to show only qualified contacts
-        const QualifiedContacts = sortedLeads.filter((lead: any) =>
-          contactStatuses.has(lead.status.name)
-        );
-
-        setContacts(QualifiedContacts);
+        return;
       }
+
+      // Check if we have workspace data
+      if (!workspaceData?.data || !Array.isArray(workspaceData.data)) {
+        console.log('No workspace data available:', workspaceData);
+        setLeads([]);
+        setContacts([]);
+        return;
+      }
+
+      console.log('Processing leads and contacts:', {
+        leadsCount: workspaceData.data.length,
+        statusData: statusData?.data,
+        hasStatusData: !!statusData?.data
+      });
+
+      // Calculate contact statuses with fallback
+      let newContactStatuses = new Set<string>();
+
+      if (Array.isArray(statusData?.data)) {
+        newContactStatuses = new Set(
+          statusData.data
+            .filter((status: any) => status && status.count_statistics)
+            .map((status: any) => status.name)
+            .filter(Boolean) // Remove any null/undefined names
+        );
+      }
+
+      // If no contact statuses found, use common fallback statuses
+      if (newContactStatuses.size === 0) {
+        console.log('No contact statuses found, using fallback statuses');
+        newContactStatuses = new Set(['Qualified', 'Customer', 'Hot Lead', 'Warm Lead']);
+      }
+
+      console.log('Contact statuses:', Array.from(newContactStatuses));
+
+      // Update the state
+      setContactStatuses(newContactStatuses);
+
+      let fetchedLeads = workspaceData.data.map(
+        (lead: any, index: number) => ({
+          id: lead.id || index + 1,
+          Name: lead.name || "",
+          email: lead.email || "",
+          phone: lead.phone || "",
+          company: lead.company || "",
+          position: lead.position || "",
+          contact_method: lead.contact_method,
+          owner: lead.owner || "Unknown",
+          status: lead.status || { name: "New" },
+          revenue: lead.revenue || 0,
+          assign_to: lead.assign_to || "Not Assigned",
+          createdAt: lead.created_at
+            ? new Date(lead.created_at).toISOString()
+            : new Date().toISOString(),
+          isDuplicate: false,
+          is_email_valid: lead.is_email_valid,
+          is_phone_valid: lead.is_phone_valid,
+          sourceId: lead?.lead_source_id ?? null,
+          businessInfo: lead?.businessInfo ?? "",
+          tag: lead?.tags ?? {},
+          address: lead?.address ?? "",
+        })
+      );
+
+      console.log('Fetched leads before processing:', fetchedLeads.length);
+
+      const duplicates = new Set();
+      fetchedLeads.forEach((lead: any) => {
+        const duplicate = fetchedLeads.find(
+          (l: any) =>
+            l.id !== lead.id &&
+            (l.email === lead.email || l.phone === lead.phone)
+        );
+        if (duplicate) {
+          duplicates.add(lead.id);
+          duplicates.add(duplicate.id);
+        }
+      });
+
+      // Mark duplicates
+      const updatedLeads = fetchedLeads.map((lead: any) => ({
+        ...lead,
+        isDuplicate: duplicates.has(lead.id),
+      }));
+
+      // Sort by most recent
+      const sortedLeads = updatedLeads.sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setLeads(sortedLeads);
+
+      // Filter leads to show only qualified contacts with enhanced logic
+      const QualifiedContacts = sortedLeads.filter((lead: any) => {
+        try {
+          // Enhanced validation
+          if (!lead || !lead.status) {
+            console.log(`Lead ${lead?.id || 'unknown'}: No status object`);
+            return false;
+          }
+
+          const statusName = lead.status.name || lead.status;
+          if (!statusName || typeof statusName !== 'string') {
+            console.log(`Lead ${lead.id}: Invalid status name:`, statusName);
+            return false;
+          }
+
+          const isContactStatus = newContactStatuses.has(statusName);
+          console.log(`Lead ${lead.id}: status="${statusName}", isContact=${isContactStatus}`);
+          return isContactStatus;
+        } catch (error) {
+          console.error(`Error processing lead ${lead?.id}:`, error);
+          return false;
+        }
+      });
+
+      console.log('Final qualified contacts:', QualifiedContacts.length);
+
+      // Prevent unnecessary re-renders by checking if data actually changed
+      const currentTimestamp = Date.now();
+      if (currentTimestamp - lastProcessedTimestamp > 1000) { // Debounce updates
+        setContacts(QualifiedContacts);
+        setLastProcessedTimestamp(currentTimestamp);
+      }
+
+      setIsProcessingData(false);
     };
 
-    // Initial fetch
-    fetchLeads();
+    setIsProcessingData(true);
 
-    // Set up polling
-    const pollInterval = setInterval(fetchLeads, POLLING_INTERVAL);
+    // Add small delay to ensure all data is settled
+    const timeoutId = setTimeout(() => {
+      processLeadsAndContacts();
+    }, 100);
 
-    // Cleanup
+    return () => clearTimeout(timeoutId);
+  }, [workspaceData, isLoadingLeads, statusData, isLoadingStatus, isLoadingWorkspace, lastProcessedTimestamp]);
+
+  // Separate polling effect to avoid interference
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const pollInterval = setInterval(() => {
+      console.log('Polling for updates...', {
+        workspaceId,
+        contactsCount: contacts.length,
+        leadsCount: leads.length,
+        isProcessingData
+      });
+      // The polling will trigger re-renders which will cause the above effect to run
+    }, POLLING_INTERVAL);
+
     return () => clearInterval(pollInterval);
-  }, [workspaceData, isLoadingLeads]);
+  }, [workspaceId, contacts.length, leads.length, isProcessingData]);
+
+  // Debug effect to monitor state changes
+  useEffect(() => {
+    console.log('Contact state updated:', {
+      contactsCount: contacts.length,
+      leadsCount: leads.length,
+      isLoadingLeads,
+      isLoadingStatus,
+      isLoadingWorkspace,
+      isProcessingData,
+      hasWorkspaceData: !!workspaceData?.data,
+      hasStatusData: !!statusData?.data,
+      workspaceId
+    });
+  }, [contacts.length, leads.length, isLoadingLeads, isLoadingStatus, isLoadingWorkspace, isProcessingData, workspaceData, statusData, workspaceId]);
 
   // useEffect(() => {
   //   console.log("contact", contacts);
@@ -364,8 +488,6 @@ export default function ContactPage() {
       is_email_valid: boolean;
     }>
   ) => {
-    // console.log("dataa", updatedData);
-
     if (
       !updatedData.businessInfo === undefined &&
       (!updatedData.tags || updatedData.tags.length === 0) &&

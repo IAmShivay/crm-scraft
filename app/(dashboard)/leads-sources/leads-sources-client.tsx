@@ -45,6 +45,7 @@ import {
 } from "@/lib/store/services/webhooks";
 import { useGetActiveWorkspaceQuery } from "@/lib/store/services/workspace";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { skipToken } from "@reduxjs/toolkit/query";
 import {
   ChevronDown,
   ChevronUp,
@@ -120,7 +121,11 @@ export function LeadSourceManagerClient() {
     isError,
     error,
     refetch: refetchWebhooks,
-  } = useGetWebhooksQuery<any>({ id: workspacesData?.data.id });
+  } = useGetWebhooksQuery<any>(
+    workspacesData?.data?.id
+      ? { id: workspacesData.data.id }
+      : skipToken
+  );
 
   const webhooksData = webhooks?.data;
   const [sources, setSources] = useState<Source[]>(webhooksData || []);

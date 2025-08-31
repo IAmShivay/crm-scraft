@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/nextjs";
 import Error from "next/error";
 
 const CustomErrorComponent = (props: any) => {
@@ -6,9 +5,8 @@ const CustomErrorComponent = (props: any) => {
 };
 
 CustomErrorComponent.getInitialProps = async (contextData: any) => {
-  // In case this is running in a serverless function, await this in order to give Sentry
-  // time to send the error before the lambda exits
-  await Sentry.captureUnderscoreErrorException(contextData);
+  // Log error for debugging
+  console.error('Error occurred:', contextData.err);
 
   // This will contain the status code of the response
   return Error.getInitialProps(contextData);
