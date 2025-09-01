@@ -3,6 +3,7 @@ import { AUTH_MESSAGES } from "@/lib/constant/auth";
 import { supabase } from "../../../lib/supabaseServer";
 import { sendMail } from "@/lib/sendmail";
 import { ActivityLogger } from "@/lib/services/activityLogger";
+import { logger } from "@/lib/logger";
 
 export default async function handler(
   req: NextApiRequest,
@@ -165,7 +166,7 @@ export default async function handler(
               </a>
               `
           );
-          console.log(existingMember, "roka", existingError)
+          logger.debug(existingMember, "roka", existingError)
 
           // Log invitation resend activity
           try {
@@ -439,7 +440,7 @@ export default async function handler(
             return res.status(401).json({ error: AUTH_MESSAGES.UNAUTHORIZED });
           }
 
-          console.log("user", user);
+          logger.debug("user", user);
           const { data, error } = await supabase
             .from("workspace_members")
             .select("role")

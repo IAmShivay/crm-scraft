@@ -28,6 +28,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { logger } from "@/lib/logger";
 
 // Enhanced TypeScript Interfaces
 interface LeadMetrics {
@@ -151,9 +152,7 @@ const AnalyticsClient = React.memo(() => {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log("Workspace changed in Redux, refetching analytics data...");
-      }
+      logger.debug("Workspace changed in Redux, refetching analytics data...");
 
       // Force refetch all data
       refetchWorkspace();
@@ -178,16 +177,14 @@ const AnalyticsClient = React.memo(() => {
 
   // Performance: Remove excessive logging in production
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Analytics Data:", {
-        workspaceId: activeWorkspace?.data?.id,
-        reduxActiveWorkspaceId,
-        workspaceChangeCounter,
-        analyticsDetails,
-        ROC,
-        workspaceCount,
-      });
-    }
+    logger.debug("Analytics Data:", {
+      workspaceId: activeWorkspace?.data?.id,
+      reduxActiveWorkspaceId,
+      workspaceChangeCounter,
+      analyticsDetails,
+      ROC,
+      workspaceCount,
+    });
   }, [
     activeWorkspace?.data?.id,
     reduxActiveWorkspaceId,

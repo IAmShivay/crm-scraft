@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger";
 
 /**
  * Hook to automatically log authentication activities
@@ -23,7 +24,7 @@ export function useActivityLogger() {
         if (lastEventRef.current && 
             lastEventRef.current.event === event && 
             now - lastEventRef.current.timestamp < 5000) {
-          console.log(`Auth event ${event} skipped - duplicate within 5s`);
+          logger.debug(`Auth event ${event} skipped - duplicate within 5s`);
           return;
         }
 
@@ -43,15 +44,15 @@ export function useActivityLogger() {
           // This will be checked by the workspace API to determine if login activity should be logged
           sessionStorage.setItem('fresh_login', 'true');
           sessionStorage.setItem('login_timestamp', now.toString());
-          console.log('Auth event: New user sign-in detected, marked as fresh login');
+          logger.debug('Auth event: New user sign-in detected, marked as fresh login');
         } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Auth event: Token refreshed, not logging as login');
+          logger.debug('Auth event: Token refreshed, not logging as login');
         } else if (event === 'SIGNED_OUT') {
           // Clear session tracking
           sessionIdRef.current = null;
           sessionStorage.removeItem('fresh_login');
           sessionStorage.removeItem('login_timestamp');
-          console.log('Auth event: User signed out');
+          logger.debug('Auth event: User signed out');
         }
       } catch (error) {
         console.error('Error in auth state change handler:', error);

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabaseServer"; // Import the Supabase client
 import { AUTH_MESSAGES } from "@/lib/constant/auth";
 import { ActivityLogger } from "@/lib/services/activityLogger";
+import { logger } from "@/lib/logger";
 
 export default async function handler(
   req: NextApiRequest,
@@ -290,7 +291,7 @@ export default async function handler(
         }
         // Update your existing getActiveWorkspace case:
         case "getActiveWorkspace": {
-          console.log("getActiveWorkspace API called");
+          logger.debug("getActiveWorkspace API called");
           const {
             data: { user },
           } = await supabase.auth.getUser(token);
@@ -299,7 +300,7 @@ export default async function handler(
             return res.status(401).json({ error: AUTH_MESSAGES.UNAUTHORIZED });
           }
 
-          console.log("getActiveWorkspace: User authenticated:", {
+          logger.debug("getActiveWorkspace: User authenticated:", {
             id: user.id,
             email: user.email
           });
@@ -323,7 +324,7 @@ export default async function handler(
 
             // If no active workspace found, set the first available one as active
             if (!activeWorkspace || activeError) {
-              console.log("getActiveWorkspace: No active workspace found, auto-activating first workspace");
+              logger.debug("getActiveWorkspace: No active workspace found, auto-activating first workspace");
               // Get the first workspace where user is a member
               const { data: firstWorkspace, error: firstError } = await supabase
                 .from("workspace_members")
@@ -366,7 +367,7 @@ export default async function handler(
                 }
 
                 // Log workspace login activity for first-time activation
-                console.log("getActiveWorkspace: First workspace activation, logging activity");
+                logger.debug("getActiveWorkspace: First workspace activation, logging activity");
                 try {
                   const loginResult = await ActivityLogger.logActivity({
                     workspace_id: firstWorkspace.workspace_id.toString(),
@@ -385,7 +386,7 @@ export default async function handler(
                     ip_address: ActivityLogger.getClientIP(req),
                     user_agent: ActivityLogger.getUserAgent(req),
                   });
-                  console.log("getActiveWorkspace: First workspace activation logged:", loginResult);
+                  logger.debug("getActiveWorkspace: First workspace activation logged:", loginResult);
                 } catch (logError) {
                   console.error('getActiveWorkspace: Failed to log workspace activation:', logError);
                   // Don't fail the request if logging fails
@@ -403,7 +404,7 @@ export default async function handler(
 
               return res.status(404).json({ error: "No workspaces found" });
             }
-            console.log("getActiveWorkspace: Found existing active workspace:", activeWorkspace);
+            logger.debug("getActiveWorkspace: Found existing active workspace:", activeWorkspace);
 
             // Check if this is a fresh login (detected by auth state listener)
             const freshLoginHeader = req.headers['x-fresh-login'] === 'true';
@@ -412,7 +413,7 @@ export default async function handler(
             
             if (freshLoginHeader && isBrowserRequest) {
               // Log login activity only for fresh logins from browser
-              console.log("getActiveWorkspace: Fresh login detected, logging login activity");
+              logger.debug("getActiveWorkspace: Fresh login detected, logging login activity");
               try {
                 const loginResult = await ActivityLogger.logLogin(
                   activeWorkspace.workspace_id.toString(),
@@ -422,13 +423,13 @@ export default async function handler(
                   ActivityLogger.getClientIP(req),
                   userAgent
                 );
-                console.log("getActiveWorkspace: Login activity logged:", loginResult);
+                logger.debug("getActiveWorkspace: Login activity logged:", loginResult);
               } catch (logError) {
                 console.error('getActiveWorkspace: Failed to log login activity:', logError);
                 // Don't fail the request if logging fails
               }
             } else {
-              console.log("getActiveWorkspace: Not a fresh login, skipping login activity log");
+              logger.debug("getActiveWorkspace: Not a fresh login, skipping login activity log");
             }
 
             // Return the existing active workspace
@@ -471,7 +472,7 @@ export default async function handler(
             const qualifiedStatusNames = qualifiedStatuses.map(
               (status) => status.name
             );
-            console.log(qualifiedStatusNames);
+            logger.debug(qualifiedStatusNames);
 
             // Count leads that match the qualified status names for the given workspace
             // Using ->> operator to access the name field within the status JSON object
@@ -624,7 +625,7 @@ export default async function handler(
 
           // Convert workspaceId to bigint
           const workspaceIdBigInt = BigInt(workspaceId as string);
-          console.log(workspaceIdBigInt);
+          logger.debug(workspaceIdBigInt);
 
           try {
             const { data, error } = await supabase.rpc(
@@ -657,7 +658,7 @@ export default async function handler(
 
       switch (action) {
         case "updateWorkspaceStatus": {
-          console.log(body);
+          logger.debug(body);
           const { id: workspace_id, status } = body;
           const {
             data: { user },
@@ -694,7 +695,7 @@ export default async function handler(
               `
               )
               .single();
-            console.log(activated);
+            logger.debug(activated);
             if (activateError) throw activateError;
 
             // Log workspace switch activity if status is true (activating)
@@ -770,7 +771,7 @@ export default async function handler(
             let hasPermission = false;
             let memberData: any = null;
 
-            console.log("Permission check debug:", {
+            logger.debug("Permission check debug:", {
               workspace_id,
               workspace_owner_id: workspace.owner_id,
               user_id: user.id,
@@ -781,7 +782,7 @@ export default async function handler(
             // Check if user is the owner
             if (workspace.owner_id === user.id) {
               hasPermission = true;
-              console.log("User is owner - permission granted");
+              logger.debug("User is owner - permission granted");
             } else {
               // Check if user is an admin or super admin in this workspace
               // Use email as primary identifier since that's what the system uses
@@ -794,7 +795,7 @@ export default async function handler(
 
               memberData = memberDataResult;
 
-              console.log("Member lookup by email:", {
+              logger.debug("Member lookup by email:", {
                 user_email: user.email,
                 memberData,
                 memberError: memberError?.message
@@ -805,12 +806,12 @@ export default async function handler(
                 const role = memberData.role?.toLowerCase();
                 if (role === "admin" || role === "superadmin") {
                   hasPermission = true;
-                  console.log("User has admin role - permission granted:", memberData.role);
+                  logger.debug("User has admin role - permission granted:", memberData.role);
                 }
               }
               
               if (!hasPermission) {
-                console.log("Permission check failed:", {
+                logger.debug("Permission check failed:", {
                   hasError: !!memberError,
                   hasMemberData: !!memberData,
                   role: memberData?.role,
@@ -832,7 +833,7 @@ export default async function handler(
                 
               if (creatorCheck) {
                 hasPermission = true;
-                console.log("User is workspace creator - permission granted");
+                logger.debug("User is workspace creator - permission granted");
               }
             }
 

@@ -87,6 +87,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { workspaceApi } from "@/lib/store/base/workspace";
 import { useRouter } from "next/navigation";
+import { logger } from "@/lib/logger";
 interface WorkspaceMember {
   id?: string;
   email: string;
@@ -416,14 +417,14 @@ export default function WorkspaceSettingsPage() {
 
   const handleAddStatus = async () => {
     if (!newStatus.name) return;
-    console.log(newStatus);
+    logger.debug(newStatus);
     const status: any = {
       id: "",
       ...newStatus,
       countInStatistics: newStatus.count_statistics,
       showInWorkspace: newStatus.showInWorkspace,
     };
-    console.log(status);
+    logger.debug(status);
     try {
       const result = await addStatus({
         statusData: status,
@@ -532,7 +533,7 @@ export default function WorkspaceSettingsPage() {
   // Tags Handle functions
   const handleAddTags = async () => {
     if (!newTags.name) return;
-    console.log(newTags);
+    logger.debug(newTags);
     const tags: any = {
       id: "",
       ...newTags,
@@ -605,7 +606,7 @@ export default function WorkspaceSettingsPage() {
 
   useEffect(() => {
     if (workspaceData?.data) {
-      console.log("Workspace data received:", workspaceData.data);
+      logger.debug("Workspace data received:", workspaceData.data);
       setSettings({
         name: workspaceData.data.name || "",
         industry: workspaceData.data.industry || "",
@@ -643,10 +644,10 @@ export default function WorkspaceSettingsPage() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      console.log("Saving workspace settings:", { id: workspaceId, data: settings });
+      logger.debug("Saving workspace settings:", { id: workspaceId, data: settings });
       
       const result = await updateWorkspace({ id: workspaceId, data: settings });
-      console.log("Save result:", result);
+      logger.debug("Save result:", result);
       
       if ("error" in result) {
         console.error("Save error:", result.error);

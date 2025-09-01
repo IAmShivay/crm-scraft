@@ -77,6 +77,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import * as z from "zod";
 import FilterComponent from "./filter";
+import { logger } from "@/lib/logger";
 
 // Zod validation schema for lead
 const leadSchema = z.object({
@@ -185,7 +186,7 @@ const LeadManagement = React.memo(() => {
           .single();
 
         if (firstError || !firstWorkspace) {
-          console.error("No workspaces found for user");
+          logger.error("No workspaces found for user");
           setIsLoadingWorkspace(false);
           return;
         }
@@ -207,7 +208,7 @@ const LeadManagement = React.memo(() => {
       setActiveWorkspace(workspaceResponse);
       setWorkspaceId(activeWorkspaceData.workspace_id?.toString() || null);
     } catch (error) {
-      console.error('Error fetching active workspace:', error);
+      logger.error('Error fetching active workspace:', error);
     } finally {
       setIsLoadingWorkspace(false);
     }
@@ -230,14 +231,14 @@ const LeadManagement = React.memo(() => {
         .eq("work_id", wsId);
 
       if (error) {
-        console.error('Error fetching leads:', error);
+        logger.error('Error fetching leads:', error);
         setIsLoadingLeads(false);
         return;
       }
 
       setWorkspaceData({ data: data || [] });
     } catch (error) {
-      console.error('Error fetching leads:', error);
+      logger.error('Error fetching leads:', error);
     } finally {
       setIsLoadingLeads(false);
     }
@@ -254,14 +255,14 @@ const LeadManagement = React.memo(() => {
         .eq('workspace_id', wsId);
 
       if (error) {
-        console.error('Error fetching webhooks:', error);
+        logger.error('Error fetching webhooks:', error);
         setIsLoadingSources(false);
         return;
       }
 
       setLeadSources({ data: data || [] });
     } catch (error) {
-      console.error('Error fetching webhooks:', error);
+      logger.error('Error fetching webhooks:', error);
     } finally {
       setIsLoadingSources(false);
     }
@@ -280,7 +281,7 @@ const LeadManagement = React.memo(() => {
         .eq("workspace_id", wsId);
 
       if (error) {
-        console.error('Error fetching workspace members:', error);
+        logger.error('Error fetching workspace members:', error);
         setIsLoadingMembers(false);
         return;
       }
@@ -292,10 +293,10 @@ const LeadManagement = React.memo(() => {
         name: member.email?.split('@')[0] || 'Unknown User'
       }));
 
-      console.log('Fetched workspace members:', processedMembers);
+      logger.debug('Fetched workspace members:', processedMembers);
       setWorkspaceMembers({ data: processedMembers });
     } catch (error) {
-      console.error('Error fetching workspace members:', error);
+      logger.error('Error fetching workspace members:', error);
     } finally {
       setIsLoadingMembers(false);
     }
@@ -312,15 +313,15 @@ const LeadManagement = React.memo(() => {
         .eq('workspace_id', wsId);
 
       if (error) {
-        console.error('Error fetching status:', error);
+        logger.error('Error fetching status:', error);
         setIsLoadingStatus(false);
         return;
       }
 
-      console.log('Fetched status data:', data);
+      logger.debug('Fetched status data:', data);
       setStatusData({ data: data || [] });
     } catch (error) {
-      console.error('Error fetching status:', error);
+      logger.error('Error fetching status:', error);
     } finally {
       setIsLoadingStatus(false);
     }
@@ -344,7 +345,7 @@ const LeadManagement = React.memo(() => {
   useEffect(() => {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
-      console.log("Workspace changed in Redux, refetching leads data...");
+      logger.debug("Workspace changed in Redux, refetching leads data...");
 
       fetchActiveWorkspace();
     }
@@ -373,7 +374,7 @@ const LeadManagement = React.memo(() => {
       return [];
     }
 
-    console.log('Processing leads data:', workspaceData.data);
+    logger.debug('Processing leads data:', workspaceData.data);
 
     const leadsArray: any[] = Array.isArray(workspaceData.data) ? workspaceData.data : [];
 
@@ -447,7 +448,7 @@ const LeadManagement = React.memo(() => {
 
   // Debug effect to monitor status data
   useEffect(() => {
-    console.log('Status data updated:', {
+    logger.debug('Status data updated:', {
       statusData,
       hasData: !!statusData?.data,
       dataLength: statusData?.data?.length,
@@ -639,7 +640,7 @@ const LeadManagement = React.memo(() => {
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error creating lead:', error);
+      logger.error('Error creating lead:', error);
       return { data: null, error: error.message };
     } finally {
       setIsCreateLoading(false);
@@ -669,7 +670,7 @@ const LeadManagement = React.memo(() => {
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error updating lead:', error);
+      logger.error('Error updating lead:', error);
       throw error;
     } finally {
       setIsUpdateLoading(false);
@@ -698,7 +699,7 @@ const LeadManagement = React.memo(() => {
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error deleting leads:', error);
+      logger.error('Error deleting leads:', error);
       throw error;
     }
   };
@@ -731,7 +732,7 @@ const LeadManagement = React.memo(() => {
 
       return { data: insertedData, error: null };
     } catch (error: any) {
-      console.error('Error creating many leads:', error);
+      logger.error('Error creating many leads:', error);
       throw error;
     } finally {
       setIsCreateManyLoading(false);
@@ -760,7 +761,7 @@ const LeadManagement = React.memo(() => {
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error updating lead:', error);
+      logger.error('Error updating lead:', error);
       throw error;
     }
   }, [workspaceId, fetchLeadsByWorkspace]);
@@ -791,7 +792,7 @@ const LeadManagement = React.memo(() => {
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error assigning lead:', error);
+      logger.error('Error assigning lead:', error);
       throw error;
     } finally {
       setIsAssignLoading(false);

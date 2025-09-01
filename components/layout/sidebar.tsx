@@ -69,6 +69,7 @@ import {
 } from "@/lib/store/slices/sideBar";
 import { RootState } from "@/lib/store/store";
 import { useDispatch, useSelector } from "react-redux";
+import { logger } from "@/lib/logger";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   logoSrc?: string;
@@ -133,7 +134,7 @@ export function Sidebar({
     isLoading: activeWorkspaceLoading,
     isError: activeWorkspaceError,
   } = useGetActiveWorkspaceQuery<any>(undefined);
-  console.log(activeWorkspace);
+  logger.debug("Active Workspace:", activeWorkspace);
 
   // ✅ Ensure activeWorkspace is available before calling status query
   const workspaceId = activeWorkspace?.data?.id;
@@ -250,7 +251,7 @@ export function Sidebar({
         name: newWorkspace.name,
         role: "Admin",
       };
-      console.log(newWorkspace.companyType, newWorkspace.companySize);
+      logger.debug(newWorkspace.companyType, newWorkspace.companySize);
       try {
         await createWorkspace({
           name: newWorkspace.name,

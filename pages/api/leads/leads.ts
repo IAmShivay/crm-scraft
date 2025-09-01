@@ -3,6 +3,7 @@ import { AUTH_MESSAGES } from "@/lib/constant/auth";
 import { supabase } from "../../../lib/supabaseServer";
 import { validateEmail, validatePhoneNumber } from "../leads";
 import { ActivityLogger } from "@/lib/services/activityLogger";
+import { logger } from "@/lib/logger";
 
 export default async function handler(
   req: NextApiRequest,
@@ -21,8 +22,8 @@ export default async function handler(
       switch (action) {
         case "createLead": {
           const body = req.body;
-          console.log(body);
-          console.log(body.name);
+          logger.debug(body);
+          logger.debug(body.name);
 
           if (!body || !body.name || !body.email) {
             return res
@@ -72,7 +73,7 @@ export default async function handler(
           // Step 2: Validate email and phone
           const isValidEmail = await validateEmail(body.email);
           const isValidPhone = await validatePhoneNumber(body.phone);
-          console.log(isValidEmail, isValidPhone);
+          logger.debug(isValidEmail, isValidPhone);
 
           // Step 3: Insert new lead
           const { data, error } = await supabase.from("leads").insert([
@@ -129,7 +130,7 @@ export default async function handler(
 
         case "createManyLead": {
           const body = req.body;
-          console.log(body);
+          logger.debug(body);
 
           if (!Array.isArray(body) || body.length === 0) {
             return res
@@ -240,7 +241,7 @@ export default async function handler(
         case "updateLeadById": {
           const { id } = query;
           const body = req.body;
-          console.log(body, id); // Debug to check received data
+          logger.debug(body, id); // Debug to check received data
 
           if (!id) {
             return res.status(400).json({ error: "Lead ID is required" });
@@ -496,7 +497,7 @@ export default async function handler(
       }
     case "getNotesById": {
       const id = query.id as string;
-      console.log(query);
+      logger.debug(query);
 
       const {
         data: { user },

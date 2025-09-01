@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { AUTH_MESSAGES } from "@/lib/constant/auth";
 import { supabase } from "../../../lib/supabaseServer";
 import { ActivityLogger } from "@/lib/services/activityLogger";
+import { logger } from "@/lib/logger";
 
 interface WebhookRequest {
   status: boolean;
@@ -140,7 +141,7 @@ export default async function handler(
         return res.status(401).json({ error: AUTH_MESSAGES.UNAUTHORIZED });
       }
       const { id: workspace_id } = query;
-      console.log(query);
+      logger.debug(query);
       const token = authHeader.split(" ")[1];
       switch (action) {
         case "getWebhooks": {
@@ -177,9 +178,9 @@ export default async function handler(
           if (!sourceId) {
             return res.status(400).json({ error: "Source ID is required" });
           }
-          console.log("sell", workspaceId, sourceId);
+          logger.debug("sell", workspaceId, sourceId);
           const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/leads?action=getLeads&sourceId=${sourceId}&workspaceId=${workspaceId}`;
-          console.log(webhookUrl);
+          logger.debug(webhookUrl);
 
           // Query the webhooks table for matching webhook
           const { data, error } = await supabase
@@ -447,7 +448,7 @@ export default async function handler(
 
             // Check if the user owns the webhook
             if (user_id === user.id) {
-              console.log("enter");
+              logger.debug("enter");
               const { data, error } = await supabase
                 .from("webhooks")
                 .update({ name, type, app_type, description })

@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabaseServer";
 import axios from "axios";
 import cors from "cors";
 import { runMiddleware } from "@/utils/runMiddleware";
+import { logger } from "@/lib/logger";
 // Normalize any input data to a string
 const normalizeInput = (data: any): string => {
   if (data === null || data === undefined) {
@@ -375,9 +376,16 @@ export default async function handler(
       throw new Error("Webhook deactivated.");
     }
 
-    const isEmailValid = await validateEmail(processedData.email);
-    const isPhoneValid = await validatePhoneNumber(processedData.phone);
-    console.log(isEmailValid, isPhoneValid);
+    // Validate email and phone
+    const isEmailValid = processedData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(processedData.email);
+    const isPhoneValid = processedData.phone && /^\+?[\d\s\-\(\)]{10,}$/.test(processedData.phone);
+    
+    logger.debug(isEmailValid, isPhoneValid);
+
+    if (!isEmailValid && !isPhoneValid) {
+      return res.status(400).json({ error: "Valid email or phone number is required" });
+    }
+
     // Add metadata
     const leadData = {
       ...processedData,

@@ -5,6 +5,7 @@ import {
   ActivityMetadata,
   MemberActivityLog 
 } from '../types/activity-logs';
+import { logger } from "@/lib/logger";
 
 /**
  * Activity Logger Service
@@ -47,7 +48,7 @@ export class ActivityLogger {
 
       const hasRecentActivity = data && data.length > 0;
       if (hasRecentActivity) {
-        console.log(`${activityType} activity cooling period active for user ${userId} in workspace ${workspaceId}. Last activity: ${data[0].created_at}`);
+        logger.debug(`${activityType} activity cooling period active for user ${userId} in workspace ${workspaceId}. Last activity: ${data[0].created_at}`);
       }
 
       return hasRecentActivity;
@@ -70,7 +71,7 @@ export class ActivityLogger {
     message?: string;
   }> {
     try {
-      console.log('ActivityLogger.logActivity called with params:', params);
+      logger.debug('ActivityLogger.logActivity called with params:', params);
 
       // Validate required parameters
       if (!params.workspace_id || !params.user_id || !params.member_email || !params.activity_type) {
@@ -91,7 +92,7 @@ export class ActivityLogger {
         );
 
         if (hasRecentLogin) {
-          console.log(`Login activity skipped due to cooling period for user ${params.user_id} in workspace ${params.workspace_id}`);
+          logger.debug(`Login activity skipped due to cooling period for user ${params.user_id} in workspace ${params.workspace_id}`);
           return {
             success: true,
             message: 'Login activity skipped due to cooling period'
@@ -113,7 +114,7 @@ export class ActivityLogger {
       };
 
       // Insert the activity log into the database
-      console.log('ActivityLogger: Attempting database insert with data:', activityLogData);
+      logger.debug('ActivityLogger: Attempting database insert with data:', activityLogData);
       const { data, error } = await supabase
         .from('member_activity_logs')
         .insert(activityLogData)
@@ -128,7 +129,7 @@ export class ActivityLogger {
         };
       }
 
-      console.log('ActivityLogger: Database insert successful:', data);
+      logger.debug('ActivityLogger: Database insert successful:', data);
 
       return {
         success: true,
@@ -159,7 +160,7 @@ export class ActivityLogger {
     const hasRecentLogin = await this.hasRecentActivity(workspaceId, userId, ActivityType.LOGIN);
 
     if (hasRecentLogin) {
-      console.log(`Login activity skipped due to cooling period for user ${userId} in workspace ${workspaceId}`);
+      logger.debug(`Login activity skipped due to cooling period for user ${userId} in workspace ${workspaceId}`);
       return {
         success: true,
         message: 'Login activity skipped due to cooling period'

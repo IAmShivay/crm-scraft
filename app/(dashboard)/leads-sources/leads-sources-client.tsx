@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import * as z from "zod";
 import { LeadSourcesSkeleton } from "./leads-sources-skeleton";
+import { logger } from "@/lib/logger";
 
 // Zod validation schema
 const sourceSchema = z.object({
@@ -137,7 +138,7 @@ export function LeadSourceManagerClient() {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
 
-      console.log(
+      logger.debug(
         "Workspace changed in Redux, refetching lead sources data..."
       );
 
@@ -163,7 +164,7 @@ export function LeadSourceManagerClient() {
     }
   }, [webhooks]);
 
-  console.log("Lead Sources Data:", {
+  logger.debug("Lead Sources Data:", {
     workspaceId: workspacesData?.data.id,
     reduxActiveWorkspaceId,
     workspaceChangeCounter,

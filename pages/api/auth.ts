@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { AUTH_MESSAGES } from "@/lib/constant/auth";
 import { supabase } from "../../lib/supabaseServer";
 import { ActivityLogger } from "@/lib/services/activityLogger";
+import { logger } from "@/lib/logger";
 
 interface AuthRequestBody {
   email?: string;
@@ -87,14 +88,14 @@ export default async function handler(
             email,
             password,
           });
-          console.log(data);
+          logger.debug(data);
           if (error) {
             return res.status(400).json({ error: error.message });
           }
           await supabase.auth.setSession(data.session);
 
           // Login activity will be logged in getActiveWorkspace to avoid duplicates
-          console.log("Auth API: User authenticated successfully");
+          logger.debug("Auth API: User authenticated successfully");
 
           return res
             .status(200)
@@ -123,7 +124,7 @@ export default async function handler(
                 workspaceForLogging = memberData;
               }
             } catch (getUserError) {
-              console.error('Auth API: Failed to get user for logout logging:', getUserError);
+              logger.error('Auth API: Failed to get user for logout logging:', getUserError);
             }
           }
 
@@ -134,26 +135,24 @@ export default async function handler(
           }
 
           // Log logout activity
-          if (userForLogging && workspaceForLogging) {
-            console.log("Auth API: Logging logout activity");
-            try {
-              await ActivityLogger.logActivity({
-                workspace_id: workspaceForLogging.workspace_id.toString(),
-                user_id: userForLogging.id,
-                member_email: userForLogging.email || '',
-                member_name: userForLogging.user_metadata?.name || userForLogging.user_metadata?.firstName,
-                activity_type: 'logout' as any,
-                activity_description: `${userForLogging.email} logged out`,
-                metadata: {
-                  workspace_name: (workspaceForLogging.workspaces as any)?.name,
-                },
-                ip_address: ActivityLogger.getClientIP(req),
-                user_agent: ActivityLogger.getUserAgent(req),
-              });
-              console.log("Auth API: Logout activity logged successfully");
-            } catch (logError) {
-              console.error('Auth API: Failed to log logout activity:', logError);
-            }
+          logger.debug("Auth API: Logging logout activity");
+          try {
+            await ActivityLogger.logActivity({
+              workspace_id: workspaceForLogging.workspace_id.toString(),
+              user_id: userForLogging.id,
+              member_email: userForLogging.email || '',
+              member_name: userForLogging.user_metadata?.name || userForLogging.user_metadata?.firstName,
+              activity_type: 'logout' as any,
+              activity_description: `${userForLogging.email} logged out`,
+              metadata: {
+                workspace_name: (workspaceForLogging.workspaces as any)?.name,
+              },
+              ip_address: ActivityLogger.getClientIP(req),
+              user_agent: ActivityLogger.getUserAgent(req),
+            });
+            logger.debug("Auth API: Logout activity logged successfully");
+          } catch (logError) {
+            logger.error('Auth API: Failed to log logout activity:', logError);
           }
 
           return res
@@ -180,7 +179,7 @@ export default async function handler(
 
             return res.status(200).json({ user: data });
           } catch (error) {
-            console.error(error);
+            logger.error(error);
             return res.status(500).json({ error: AUTH_MESSAGES.API_ERROR });
           }
         }
@@ -214,7 +213,7 @@ export default async function handler(
               .single();
 
             if (inviteError) {
-              console.error(
+              logger.error(
                 "Error checking pending invite:",
                 inviteError.message
               );
@@ -231,7 +230,7 @@ export default async function handler(
               await supabase.auth.admin.listUsers();
 
             if (userError) {
-              console.error("Error fetching users:", userError.message);
+              logger.error("Error fetching users:", userError.message);
               res.status(500).json({ error: "Failed to fetch users" });
               break;
             }
@@ -255,7 +254,7 @@ export default async function handler(
                 .eq("email", email);
 
               if (updateError) {
-                console.error(
+                logger.error(
                   "Error updating workspace membership:",
                   updateError.message
                 );
@@ -275,7 +274,7 @@ export default async function handler(
               res.status(302).end();
             }
           } catch (error: any) {
-            console.error("Unexpected error:", error.message);
+            logger.error("Unexpected error:", error.message);
             res.status(500).json({ error: "An unexpected error occurred" });
           }
           break;

@@ -43,6 +43,6 @@ export const workspaceApi = createApi({
   ],
   endpoints: () => ({}),
   keepUnusedDataFor: 300, // Increase cache time to 5 minutes
-  refetchOnReconnect: true,
+  refetchOnReconnect: false, // Disable automatic refetching
   refetchOnFocus: false, // Only refetch when explicitly needed
 });

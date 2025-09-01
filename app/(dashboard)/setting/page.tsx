@@ -29,6 +29,7 @@ import {
   Shield 
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { logger } from "@/lib/logger";
 
 // Profile Settings Interface
 interface ProfileSettings {
@@ -83,7 +84,7 @@ export default function ProfileSettingsPage() {
 
   const handleSaveProfile = () => {
     // Implement save logic
-    console.log('Saving profile settings', profile);
+    logger.debug('Saving profile settings', profile);
   };
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

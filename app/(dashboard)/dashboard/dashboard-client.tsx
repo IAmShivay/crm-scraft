@@ -16,6 +16,7 @@ import { Award, TrendingUp, UserPlus, Users } from "lucide-react";
 import React, { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { formatCurrency, formatAmount, formatPercentage, formatChange, getChangeColorClass } from "./utils";
+import { logger } from "@/lib/logger";
 
 // Dynamically import heavy components for code splitting
 const DashboardChart = lazy(
@@ -98,9 +99,7 @@ const DashboardClient = React.memo(() => {
 
   // Memoized click handler
   const handleStatClick = useCallback(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("clicked");
-    }
+    logger.debug("clicked");
   }, []);
 
   useEffect(() => {
@@ -113,9 +112,7 @@ const DashboardClient = React.memo(() => {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log("Workspace changed in Redux, refetching data...");
-      }
+      logger.debug("Workspace changed in Redux, refetching data...");
 
       // Force refetch all data
       refetchActiveWorkspace();
@@ -230,18 +227,16 @@ const DashboardClient = React.memo(() => {
 
   // Performance: Remove excessive logging in production
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Dashboard Data:", {
-        workspaceId,
-        reduxActiveWorkspaceId,
-        workspaceChangeCounter,
-        revenue: workspaceRevenue,
-        ROC,
-        qualifiedCount,
-        workspaceCount,
-        webhooks,
-      });
-    }
+    logger.debug("Dashboard Data:", {
+      workspaceId,
+      reduxActiveWorkspaceId,
+      workspaceChangeCounter,
+      revenue: workspaceRevenue,
+      ROC,
+      qualifiedCount,
+      workspaceCount,
+      webhooks,
+    });
   }, [
     workspaceId,
     reduxActiveWorkspaceId,

@@ -47,6 +47,7 @@ import { RootState } from "@/lib/store/store";
 import { extractUserNameAndTimestamp } from "@/utils/message";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useSelector } from "react-redux";
+import { logger } from "@/lib/logger";
 const IndividualLeadPage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
@@ -157,7 +158,7 @@ const IndividualLeadPage: React.FC = () => {
       </div>
     );
   }
-  console.log(notes);
+  logger.debug(notes);
   const handleAddNote = () => {
     if (newNote.trim()) {
       const author = user?.firstName || user?.name || "Unknown";
@@ -197,8 +198,8 @@ const IndividualLeadPage: React.FC = () => {
   const result = extractUserNameAndTimestamp(
     notes.map((note) => note?.message)
   );
-  console.log(result);
-  // console.log(notes.map(note => note.message))
+  logger.debug(result);
+  // logger.debug(notes.map(note => note.message))
   const sanitizedPhone = currentLead?.phone.replace(/\D/g, "");
   return (
     <div

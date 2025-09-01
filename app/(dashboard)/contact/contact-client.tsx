@@ -65,6 +65,7 @@ import { CardTitle } from "@/components/ui/card";
 import WebhookStatus from "@/components/ui/WebhookStatus";
 import { RootState } from "@/lib/store/store";
 import { useSelector } from "react-redux";
+import { logger } from "@/lib/logger";
 // import { useRouter } from "next/router";
 // import { Loader2} from "@/components/ui";
 
@@ -242,7 +243,7 @@ const ContactPage = React.memo(() => {
     const processLeadsAndContacts = () => {
       // Enhanced loading checks
       if (isLoadingLeads || isLoadingStatus || isLoadingWorkspace) {
-        console.log('Still loading data:', {
+        logger.debug('Still loading data:', {
           isLoadingLeads,
           isLoadingStatus,
           isLoadingWorkspace,
@@ -254,13 +255,13 @@ const ContactPage = React.memo(() => {
 
       // Check if we have workspace data
       if (!workspaceData?.data || !Array.isArray(workspaceData.data)) {
-        console.log('No workspace data available:', workspaceData);
+        logger.debug('No workspace data available:', workspaceData);
         setLeads([]);
         setContacts([]);
         return;
       }
 
-      console.log('Processing leads and contacts:', {
+      logger.debug('Processing leads and contacts:', {
         leadsCount: workspaceData.data.length,
         statusData: statusData?.data,
         hasStatusData: !!statusData?.data
@@ -280,11 +281,11 @@ const ContactPage = React.memo(() => {
 
       // If no contact statuses found, use common fallback statuses
       if (newContactStatuses.size === 0) {
-        console.log('No contact statuses found, using fallback statuses');
+        logger.debug('No contact statuses found, using fallback statuses');
         newContactStatuses = new Set(['Qualified', 'Customer', 'Hot Lead', 'Warm Lead']);
       }
 
-      console.log('Contact statuses:', Array.from(newContactStatuses));
+      logger.debug('Contact statuses:', Array.from(newContactStatuses));
 
       // Update the state
       setContactStatuses(newContactStatuses);
@@ -315,7 +316,7 @@ const ContactPage = React.memo(() => {
         })
       );
 
-      console.log('Fetched leads before processing:', fetchedLeads.length);
+      logger.debug('Fetched leads before processing:', fetchedLeads.length);
 
       const duplicates = new Set();
       fetchedLeads.forEach((lead: any) => {
@@ -349,26 +350,26 @@ const ContactPage = React.memo(() => {
         try {
           // Enhanced validation
           if (!lead || !lead.status) {
-            console.log(`Lead ${lead?.id || 'unknown'}: No status object`);
+            logger.debug(`Lead ${lead?.id || 'unknown'}: No status object`);
             return false;
           }
 
           const statusName = lead.status.name || lead.status;
           if (!statusName || typeof statusName !== 'string') {
-            console.log(`Lead ${lead.id}: Invalid status name:`, statusName);
+            logger.debug(`Lead ${lead.id}: Invalid status name:`, statusName);
             return false;
           }
 
           const isContactStatus = newContactStatuses.has(statusName);
-          console.log(`Lead ${lead.id}: status="${statusName}", isContact=${isContactStatus}`);
+          logger.debug(`Lead ${lead.id}: status="${statusName}", isContact=${isContactStatus}`);
           return isContactStatus;
         } catch (error) {
-          console.error(`Error processing lead ${lead?.id}:`, error);
+          logger.error(`Error processing lead ${lead?.id}:`, error);
           return false;
         }
       });
 
-      console.log('Final qualified contacts:', QualifiedContacts.length);
+      logger.debug('Final qualified contacts:', QualifiedContacts.length);
 
       // Prevent unnecessary re-renders by checking if data actually changed
       const currentTimestamp = Date.now();
@@ -394,7 +395,7 @@ const ContactPage = React.memo(() => {
 
   // Debug effect to monitor state changes
   useEffect(() => {
-    console.log('Contact state updated:', {
+    logger.debug('Contact state updated:', {
       contactsCount: contacts.length,
       leadsCount: leads.length,
       isLoadingLeads,
@@ -408,7 +409,7 @@ const ContactPage = React.memo(() => {
   }, [contacts.length, leads.length, isLoadingLeads, isLoadingStatus, isLoadingWorkspace, isProcessingData, workspaceData, statusData, workspaceId]);
 
   // useEffect(() => {
-  //   console.log("contact", contacts);
+  //   logger.debug("contact", contacts);
   // }, [contacts]);
 
   useEffect(() => {
