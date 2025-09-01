@@ -2,6 +2,8 @@
  * Robust retry mechanism with exponential backoff and jitter
  */
 
+import { logger } from "./logger";
+
 export interface RetryOptions {
   maxAttempts?: number;
   baseDelay?: number;
@@ -14,7 +16,7 @@ export interface RetryOptions {
 }
 
 export class RetryManager {
-  private defaultOptions: Required<RetryOptions> = {
+  private _defaultOptions: Required<RetryOptions> = {
     maxAttempts: 3,
     baseDelay: 1000,
     maxDelay: 30000,
@@ -24,6 +26,14 @@ export class RetryManager {
     onRetry: () => {},
     onMaxAttemptsReached: () => {},
   };
+
+  get defaultOptions(): Required<RetryOptions> {
+    return this._defaultOptions;
+  }
+
+  setDefaultOptions(options: Partial<RetryOptions>): void {
+    this._defaultOptions = { ...this._defaultOptions, ...options };
+  }
 
   /**
    * Generic retry function with exponential backoff
@@ -99,14 +109,10 @@ export class RetryManager {
         );
       },
       onRetry: (attempt, error, delay) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`API call failed, retrying in ${delay}ms (attempt ${attempt}):`, error);
-        }
+        logger.warn(`API call failed, retrying in ${delay}ms (attempt ${attempt}):`, error);
       },
       onMaxAttemptsReached: (error, attempts) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.error(`API call failed after ${attempts} attempts:`, error);
-        }
+        logger.error(`API call failed after ${attempts} attempts:`, error);
       },
       ...options,
     };
@@ -125,19 +131,17 @@ export const persistentRetry = new RetryManager();
 export const apiRetry = new RetryManager();
 
 // Configure persistent retry for long-running operations
-persistentRetry.defaultOptions = {
-  ...persistentRetry.defaultOptions,
+persistentRetry.setDefaultOptions({
   maxAttempts: 10,
   baseDelay: 2000,
   maxDelay: 60000,
-};
+});
 
 // Configure API retry for common API operations
-apiRetry.defaultOptions = {
-  ...apiRetry.defaultOptions,
+apiRetry.setDefaultOptions({
   maxAttempts: 3,
   baseDelay: 1000,
   maxDelay: 10000,
-};
+});
 
 export default RetryManager;

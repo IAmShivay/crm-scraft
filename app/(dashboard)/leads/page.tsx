@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import LeadManagement from "./leads-client";
 import { LeadsSkeleton } from "./leads-skeleton";
+import ErrorBoundary from "@/components/error/ErrorBoundary";
 
 // Optional: Use Edge runtime for fast global response
 export const runtime = "edge";
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
     );
 
     if (!response.ok) {
-      console.error("API error:", response.status);
+      // Silent error handling for metadata - don't log in production
       return fallbackMetadata;
     }
 
@@ -53,7 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Manage and track your sales leads efficiently",
     };
   } catch (error) {
-    console.error("Metadata fetch error:", error);
+    // Silent error handling for metadata - don't log in production
     return fallbackMetadata;
   }
 }
@@ -70,9 +71,11 @@ function getDefaultMetadata(): Metadata {
 export default function LeadsPage() {
   return (
     <div className="leads-container">
-      <Suspense fallback={<LeadsSkeleton />}>
-        <LeadManagement />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<LeadsSkeleton />}>
+          <LeadManagement />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

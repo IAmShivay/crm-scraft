@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import DashboardClient from "./dashboard-client";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import ErrorBoundary from "@/components/error/ErrorBoundary";
 import type { Metadata } from "next";
 
 export const runtime = "edge";
@@ -35,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
     );
 
     if (!response.ok) {
-      console.error("API error:", response.status);
+      // Silent error handling for metadata - don't log in production
       return fallbackMetadata;
     }
 
@@ -47,7 +48,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Sales performance dashboard with real-time analytics",
     };
   } catch (error) {
-    console.error("Metadata fetch error:", error);
+    // Silent error handling for metadata - don't log in production
     return fallbackMetadata;
   }
 }
@@ -62,9 +63,11 @@ function getDefaultMetadata(): Metadata {
 export default function DashboardPage() {
   return (
     <div className="dashboard-container">
-      <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardClient />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<DashboardSkeleton />}>
+          <DashboardClient />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

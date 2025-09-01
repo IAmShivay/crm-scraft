@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { AnalyticsClient } from "./analytics-client";
 import { AnalyticsSkeleton } from "./analytics-skeleton";
+import ErrorBoundary from "@/components/error/ErrorBoundary";
 
 export const runtime = "edge";
 
@@ -35,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
     );
 
     if (!response.ok) {
-      console.error("API error:", response.status);
+      // Silent error handling for metadata - don't log in production
       return fallbackMetadata;
     }
 
@@ -48,7 +49,7 @@ export async function generateMetadata(): Promise<Metadata> {
         "View detailed analytics and performance metrics for your sales activities",
     };
   } catch (error) {
-    console.error("Metadata fetch error:", error);
+    // Silent error handling for metadata - don't log in production
     return fallbackMetadata;
   }
 }
@@ -65,9 +66,11 @@ function getDefaultMetadata(): Metadata {
 export default function AnalyticsPage() {
   return (
     <div className="analytics-container">
-      <Suspense fallback={<AnalyticsSkeleton />}>
-        <AnalyticsClient />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<AnalyticsSkeleton />}>
+          <AnalyticsClient />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
