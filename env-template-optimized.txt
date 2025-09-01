@@ -1,0 +1,81 @@
+# ==============================================
+# NEXT.JS CRM APPLICATION ENVIRONMENT VARIABLES
+# ==============================================
+
+# ------------------- SUPABASE CONFIGURATION -------------------
+# Main Supabase Configuration (Required by your CRM app)
+NEXT_PUBLIC_SUPABASE_URL=https://supabasekong-skc0880c08cg804800w8gg4k.breaktheice.in
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1NTkxNzY0MCwiZXhwIjo0OTExNTkxMjQwLCJyb2xlIjoiYW5vbiJ9._-4qFVS61xfssLEhQthWJNv_pyFUQLfxSlGTSm09PcE
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1NTkxNzY0MCwiZXhwIjo0OTExNTkxMjQwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.tXoxMKRKM6zQJtzkN05-DpRI7VF4lBJaxPdQkGu887U
+
+# ------------------- APP CONFIGURATION -------------------
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+PUBLIC_URL=http://localhost:3000/
+NODE_ENV=development
+
+# ------------------- SMTP CONFIGURATION -------------------
+SMTP_HOST=smtp.emailit.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USERNAME=noreply@crm.scraft.studio
+SMTP_PASS=em_x2sNVVpgcXB2PGYnBjKfHjxN23NjZLnF
+SMTP_USER=noreply@crm.scraft.studio
+SMTP_ADMIN_EMAIL=noreply@crm.scraft.studio
+SMTP_SENDER_NAME=Breaktheice
+
+# ------------------- PERFORMANCE OPTIMIZATION -------------------
+NEXT_TELEMETRY_DISABLED=1
+
+# ------------------- AI CONFIGURATION -------------------
+OPENAI_API_KEY=
+
+# ------------------- SUPABASE INTERNAL (Keep for reference) -------------------
+API_EXTERNAL_URL=https://supabasekong-skc0880c08cg804800w8gg4k.breaktheice.in/
+SERVICE_FQDN_SUPABASEKONG=https://supabasekong-skc0880c08cg804800w8gg4k.breaktheice.in
+
+# Supabase Auth Settings
+DISABLE_SIGNUP=false
+ENABLE_ANONYMOUS_USERS=false
+ENABLE_EMAIL_AUTOCONFIRM=true
+ENABLE_EMAIL_SIGNUP=true
+ENABLE_PHONE_AUTOCONFIRM=true
+ENABLE_PHONE_SIGNUP=true
+FUNCTIONS_VERIFY_JWT=false
+JWT_EXPIRY=3600
+
+# Database Configuration
+POSTGRES_DB=postgres
+POSTGRES_HOSTNAME=supabase-db
+POSTGRES_PORT=5432
+PGRST_DB_SCHEMAS=public,storage,graphql_public
+
+# Connection Pooling
+POOLER_DEFAULT_POOL_SIZE=20
+POOLER_MAX_CLIENT_CONN=100
+
+# Image Processing
+IMGPROXY_ENABLE_WEBP_DETECTION=true
+
+# Mailer URL Paths
+MAILER_URLPATHS_CONFIRMATION=/auth/v1/verify
+MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify
+MAILER_URLPATHS_INVITE=/auth/v1/verify
+MAILER_URLPATHS_RECOVERY=/auth/v1/verify
+
+# Service Passwords (Keep secure)
+SERVICE_PASSWORD_ADMIN=5IBm7tfynAISScCY741iY14ozkmSwCmQ
+SERVICE_PASSWORD_JWT=P5jZqMpKT3kM6GTRfjxGIL291H4cHDOx
+SERVICE_PASSWORD_LOGFLARE=9VUVHU8Yjrt3cEQSjecBE7gBAeyW5idd
+SERVICE_PASSWORD_MINIO=Ahp3Af1dDOvKP5DfmEYaUenwRYB7rYEl
+SERVICE_PASSWORD_POSTGRES=fbrd3Y2UOexlhyUhFk49FyZukG4xiMrn
+SERVICE_PASSWORD_SUPAVISORSECRET=mpUzeEbdby0BES3pd32Y9LOOoW7aGQj1
+SERVICE_PASSWORD_VAULTENC=m9qdGnzqLpSp0wqdeK9u444uPhMpmB6x
+
+# Service Users
+SERVICE_USER_ADMIN=Gx90H3C09KKECSTq
+SERVICE_USER_MINIO=FfBAp2WZ4Fob98Fa
+
+# Studio Configuration
+STUDIO_DEFAULT_ORGANIZATION=Default Organization
+STUDIO_DEFAULT_PROJECT=Default Project
