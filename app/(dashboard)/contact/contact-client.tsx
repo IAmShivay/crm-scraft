@@ -56,7 +56,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Resizable } from "react-resizable";
 import "react-resizable/css/styles.css";
 import { toast } from "sonner";
@@ -85,7 +85,7 @@ interface Tags {
   color: string;
 }
 
-export default function ContactPage() {
+const ContactPage = React.memo(() => {
   const router = useRouter();
   const [contacts, setContacts] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -178,7 +178,12 @@ export default function ContactPage() {
 
   // fetching leads - ORIGINAL REDUX PATTERN with improved error handling
   const { data: activeWorkspace, isLoading: isLoadingWorkspace, error: workspaceError } =
-    useGetActiveWorkspaceQuery<any>(undefined);
+    useGetActiveWorkspaceQuery<any>(undefined, {
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    });
 
   const workspaceId = activeWorkspace?.data?.id;
 
@@ -188,25 +193,37 @@ export default function ContactPage() {
         ? ({ workspaceId: workspaceId.toString() } as { workspaceId: string })
         : skipToken,
       {
-        pollingInterval: 10000,
-        // Add retry logic for better reliability
-        refetchOnMountOrArgChange: true,
-        refetchOnReconnect: true,
+        pollingInterval: 0, // Disable aggressive polling
+        refetchOnMountOrArgChange: false,
+        refetchOnReconnect: false,
+        refetchOnFocus: false,
       }
     );
 
   const { data: workspaceMembers, isLoading: isLoadingMembers } =
-    useGetWorkspaceMembersQuery(workspaceId ? workspaceId : skipToken);
+    useGetWorkspaceMembersQuery(workspaceId ? workspaceId : skipToken, {
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    });
 
   const { data: tagsData, isLoading: isLoadingTags }: any =
-    useGetTagsQuery(workspaceId ? workspaceId : skipToken);
+    useGetTagsQuery(workspaceId ? workspaceId : skipToken, {
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    });
 
-  const POLLING_INTERVAL = 10000;
+  // Performance: Removed POLLING_INTERVAL - no longer needed
 
   const { data: statusData, isLoading: isLoadingStatus, error: statusError }: any =
     useGetStatusQuery(workspaceId ? workspaceId : skipToken, {
-      // Ensure status data is fetched reliably
-      refetchOnMountOrArgChange: true,
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
     });
 
   // Add error logging for debugging
@@ -373,22 +390,7 @@ export default function ContactPage() {
     return () => clearTimeout(timeoutId);
   }, [workspaceData, isLoadingLeads, statusData, isLoadingStatus, isLoadingWorkspace, lastProcessedTimestamp]);
 
-  // Separate polling effect to avoid interference
-  useEffect(() => {
-    if (!workspaceId) return;
-
-    const pollInterval = setInterval(() => {
-      console.log('Polling for updates...', {
-        workspaceId,
-        contactsCount: contacts.length,
-        leadsCount: leads.length,
-        isProcessingData
-      });
-      // The polling will trigger re-renders which will cause the above effect to run
-    }, POLLING_INTERVAL);
-
-    return () => clearInterval(pollInterval);
-  }, [workspaceId, contacts.length, leads.length, isProcessingData]);
+  // Performance: Removed manual polling - using smart caching instead
 
   // Debug effect to monitor state changes
   useEffect(() => {
@@ -2105,4 +2107,6 @@ export default function ContactPage() {
       </div>
     </div>
   );
-}
+});
+
+export default ContactPage;

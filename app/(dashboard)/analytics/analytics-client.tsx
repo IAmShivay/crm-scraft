@@ -11,7 +11,7 @@ import {
 } from "@/lib/store/services/workspace";
 import { RootState } from "@/lib/store/store";
 import { IndianRupee, TrendingUp, Users } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   Bar,
@@ -54,7 +54,7 @@ interface AnalyticsData {
 
 const CHART_COLORS = ["#0088FE", "#f1c232", "#38761d", "#FF8042"];
 
-export function AnalyticsClient() {
+const AnalyticsClient = React.memo(() => {
   const isCollapsed = useSelector(
     (state: RootState) => state.sidebar.isCollapsed
   );
@@ -76,7 +76,12 @@ export function AnalyticsClient() {
     data: activeWorkspace,
     isLoading: isLoadingWorkspace,
     refetch: refetchWorkspace,
-  } = useGetActiveWorkspaceQuery<any>(undefined);
+  } = useGetActiveWorkspaceQuery<any>(undefined, {
+    pollingInterval: 0,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
+  });
 
   const {
     data: analyticsDetails,
@@ -84,6 +89,10 @@ export function AnalyticsClient() {
     refetch: refetchAnalytics,
   } = useGetRevenueByWorkspaceQuery(activeWorkspace?.data?.id, {
     skip: !activeWorkspace?.data?.id,
+    pollingInterval: 0,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   const {
@@ -92,7 +101,13 @@ export function AnalyticsClient() {
     refetch: refetchTotalLeads,
   } = useGetLeadsByWorkspaceQuery(
     { workspaceId: activeWorkspace?.data?.id },
-    { skip: !activeWorkspace?.data?.id }
+    { 
+      skip: !activeWorkspace?.data?.id,
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    }
   );
 
   const {
@@ -101,6 +116,10 @@ export function AnalyticsClient() {
     refetch: refetchAnalyticsData,
   } = useGetWorkspaceDetailsAnalyticsQuery(activeWorkspace?.data?.id, {
     skip: !activeWorkspace?.data?.id,
+    pollingInterval: 0,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   const {
@@ -109,6 +128,10 @@ export function AnalyticsClient() {
     refetch: refetchROC,
   } = useGetROCByWorkspaceQuery(activeWorkspace?.data?.id, {
     skip: !activeWorkspace?.data?.id,
+    pollingInterval: 0,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   const {
@@ -117,6 +140,10 @@ export function AnalyticsClient() {
     refetch: refetchWorkspaceCount,
   } = useGetCountByWorkspaceQuery(activeWorkspace?.data?.id, {
     skip: !activeWorkspace?.data?.id,
+    pollingInterval: 0,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   // Listen for workspace changes in Redux and refetch data
@@ -124,7 +151,9 @@ export function AnalyticsClient() {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
 
-      console.log("Workspace changed in Redux, refetching analytics data...");
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Workspace changed in Redux, refetching analytics data...");
+      }
 
       // Force refetch all data
       refetchWorkspace();
@@ -147,16 +176,18 @@ export function AnalyticsClient() {
     activeWorkspace?.data?.id,
   ]);
 
-  // Debug logging
+  // Performance: Remove excessive logging in production
   useEffect(() => {
-    console.log("Analytics Data:", {
-      workspaceId: activeWorkspace?.data?.id,
-      reduxActiveWorkspaceId,
-      workspaceChangeCounter,
-      analyticsDetails,
-      ROC,
-      workspaceCount,
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Analytics Data:", {
+        workspaceId: activeWorkspace?.data?.id,
+        reduxActiveWorkspaceId,
+        workspaceChangeCounter,
+        analyticsDetails,
+        ROC,
+        workspaceCount,
+      });
+    }
   }, [
     activeWorkspace?.data?.id,
     reduxActiveWorkspaceId,
@@ -415,4 +446,6 @@ export function AnalyticsClient() {
       </div>
     </div>
   );
-}
+});
+
+export { AnalyticsClient };

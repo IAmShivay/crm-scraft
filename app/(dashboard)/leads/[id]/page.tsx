@@ -66,7 +66,10 @@ const IndividualLeadPage: React.FC = () => {
   } = useGetLeadByIdQuery(
     { id: leadId },
     {
-      pollingInterval: 2000, // 2 seconds
+      pollingInterval: 0, // Disable aggressive polling
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
     }
   );
   const currentLead = leadsData?.data?.[0];
@@ -74,11 +77,22 @@ const IndividualLeadPage: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [notes, setNotes] = useState<Array<{ message: string }>>([]);
   const { data: activeWorkspace, isLoading: isLoadingWorkspace } =
-    useGetActiveWorkspaceQuery<any>(undefined);
+    useGetActiveWorkspaceQuery<any>(undefined, {
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    });
   const workspaceId = activeWorkspace?.data.id;
   // Type the notes state properly
   const { data: statusData, isLoading: isLoadingStatus }: any =
-    useGetStatusQuery(workspaceId);
+    useGetStatusQuery(workspaceId, {
+      skip: !workspaceId,
+      pollingInterval: 0,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    });
 
   useEffect(() => {
     // Set initial notes when lead data loads

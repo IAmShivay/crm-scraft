@@ -13,7 +13,7 @@ import {
 import { setActiveWorkspaceId } from "@/lib/store/slices/sideBar";
 import { RootState } from "@/lib/store/store";
 import { Award, TrendingUp, UserPlus, Users } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { formatCurrency, formatAmount, formatPercentage, formatChange, getChangeColorClass } from "./utils";
 
@@ -44,7 +44,7 @@ export function prefetchDashboardData(workspaceId: string) {
   );
 }
 
-export default function DashboardClient() {
+const DashboardClient = React.memo(() => {
   const dispatch = useDispatch();
   const isCollapsed = useSelector(
     (state: RootState) => state.sidebar.isCollapsed
@@ -66,21 +66,24 @@ export default function DashboardClient() {
   // Use SWR-like pattern with stale-while-revalidate
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Step 1: Get active workspace with higher polling interval
+  // Step 1: Get active workspace with optimized settings
   const {
     data: activeWorkspace,
     isLoading: isWorkspaceLoading,
     refetch: refetchActiveWorkspace,
   } = useGetActiveWorkspaceQuery(undefined, {
-    pollingInterval: 300000, 
+    pollingInterval: 0, // Disable polling completely
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   const workspaceId = activeWorkspace?.data?.id;
   const workspaceCurrency = activeWorkspace?.data?.currency || 'INR';
   const workspaceTimezone = activeWorkspace?.data?.timezone || 'UTC';
   
-  // Get currency symbol
-  const getCurrencySymbol = (currency: string) => {
+  // Get currency symbol - memoized for performance
+  const getCurrencySymbol = useCallback((currency: string) => {
     const symbols: Record<string, string> = {
       USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥',
       CNY: '¥', AUD: 'A$', CAD: 'C$', CHF: 'Fr', HKD: 'HK$',
@@ -89,9 +92,16 @@ export default function DashboardClient() {
       SAR: '﷼', THB: '฿', IDR: 'Rp', MYR: 'RM', PHP: '₱'
     };
     return symbols[currency] || currency;
-  };
+  }, []);
   
   const currencySymbol = getCurrencySymbol(workspaceCurrency);
+
+  // Memoized click handler
+  const handleStatClick = useCallback(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("clicked");
+    }
+  }, []);
 
   useEffect(() => {
     if (workspaceId && workspaceId !== reduxActiveWorkspaceId) {
@@ -103,7 +113,9 @@ export default function DashboardClient() {
     if (workspaceChangeCounter > prevWorkspaceChangeCounterRef.current) {
       prevWorkspaceChangeCounterRef.current = workspaceChangeCounter;
 
-      console.log("Workspace changed in Redux, refetching data...");
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Workspace changed in Redux, refetching data...");
+      }
 
       // Force refetch all data
       refetchActiveWorkspace();
@@ -117,14 +129,17 @@ export default function DashboardClient() {
     }
   }, [workspaceId]);
 
-  // Step 2: Fetch all other data in parallel once workspaceId is available
+  // Step 2: Fetch all other data with aggressive caching
   const {
     data: workspaceRevenue,
     isLoading: isRevenueLoading,
     refetch: refetchRevenue,
   } = useGetRevenueByWorkspaceQuery(workspaceId, {
     skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    pollingInterval: 0,
   });
 
   const {
@@ -133,7 +148,10 @@ export default function DashboardClient() {
     refetch: refetchROC,
   } = useGetROCByWorkspaceQuery(workspaceId, {
     skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    pollingInterval: 0,
   });
 
   const {
@@ -142,7 +160,10 @@ export default function DashboardClient() {
     refetch: refetchQualifiedCount,
   } = useGetQualifiedCountQuery(workspaceId, {
     skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    pollingInterval: 0,
   });
 
   const {
@@ -151,7 +172,10 @@ export default function DashboardClient() {
     refetch: refetchCount,
   } = useGetCountByWorkspaceQuery(workspaceId, {
     skip: !workspaceId,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    pollingInterval: 0,
   });
 
   const {
@@ -165,7 +189,10 @@ export default function DashboardClient() {
     },
     {
       skip: !workspaceId || !ROC?.top_source_id,
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      pollingInterval: 0,
     }
   );
 
@@ -201,18 +228,20 @@ export default function DashboardClient() {
   const updatedRevenue = workspaceRevenue?.totalRevenue?.toFixed(2) || "0";
   const { monthly_stats } = ROC || { monthly_stats: [] };
 
-  // For debugging
+  // Performance: Remove excessive logging in production
   useEffect(() => {
-    console.log("Dashboard Data:", {
-      workspaceId,
-      reduxActiveWorkspaceId,
-      workspaceChangeCounter,
-      revenue: workspaceRevenue,
-      ROC,
-      qualifiedCount,
-      workspaceCount,
-      webhooks,
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Dashboard Data:", {
+        workspaceId,
+        reduxActiveWorkspaceId,
+        workspaceChangeCounter,
+        revenue: workspaceRevenue,
+        ROC,
+        qualifiedCount,
+        workspaceCount,
+        webhooks,
+      });
+    }
   }, [
     workspaceId,
     reduxActiveWorkspaceId,
@@ -224,7 +253,7 @@ export default function DashboardClient() {
     webhooks,
   ]);
 
-  const dashboardStats = [
+  const dashboardStats = useMemo(() => [
     {
       title: "Revenue",
       value: formatCurrency(updatedRevenue, currencySymbol),
@@ -258,13 +287,28 @@ export default function DashboardClient() {
       change: "5 Deals",
       isLoading: isWebhooksLoading && !isInitialLoad,
     },
-  ];
+  ], [
+    updatedRevenue,
+    currencySymbol,
+    workspaceRevenue?.change,
+    isRevenueLoading,
+    isInitialLoad,
+    qualifiedCount?.qualifiedLeadsCount,
+    isQualifiedCountLoading,
+    arrivedLeadsCount,
+    isCountLoading,
+    ROC?.conversion_rate,
+    isRocLoading,
+    webhooks?.name,
+    isWebhooksLoading
+  ]);
 
-  const salesData =
+  const salesData = useMemo(() => 
     monthly_stats?.map((stat: { month: string; convertedLeads: number }) => ({
       month: stat.month,
       sales: stat.convertedLeads,
-    })) || [];
+    })) || [], [monthly_stats]
+  );
 
   return (
     <div
@@ -306,10 +350,10 @@ export default function DashboardClient() {
                   <Skeleton className="h-6 w-24" />
                 ) : (
                   <>
-                    <p
-                      className="text-lg sm:text-xl font-semibold truncate cursor-pointer"
-                      onClick={() => console.log("clicked")}
-                    >
+                                         <p
+                       className="text-lg sm:text-xl font-semibold truncate cursor-pointer"
+                       onClick={handleStatClick}
+                     >
                       {stat.value}
                     </p>
                     {stat.change && (
@@ -381,7 +425,9 @@ export default function DashboardClient() {
           />
         </Suspense>
       )}
-    </div>
-    </div>
-  );
-}
+         </div>
+     </div>
+   );
+ });
+
+export default DashboardClient;

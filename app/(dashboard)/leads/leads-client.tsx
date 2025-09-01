@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -102,7 +102,7 @@ const initialFilters = {
   showDuplicates: false,
 };
 
-const LeadManagement = () => {
+const LeadManagement = React.memo(() => {
   const isCollapsed = useAppSelector((state) => state.sidebar.isCollapsed);
   const { formatDate: formatWorkspaceDate } = useWorkspace();
 
@@ -365,17 +365,7 @@ const LeadManagement = () => {
     []
   );
 
-  // Set up polling for real-time updates
-  useEffect(() => {
-    if (!workspaceId) return;
-
-    const pollInterval = setInterval(() => {
-      console.log('Polling for leads updates...');
-      fetchLeadsByWorkspace(workspaceId);
-    }, 30000); // Poll every 30 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [workspaceId, fetchLeadsByWorkspace]);
+  // Performance: Removed manual polling - using smart caching instead
 
   // Memoized leads processing for better performance
   const processedLeads = useMemo(() => {
@@ -2216,6 +2206,6 @@ const LeadManagement = () => {
       </Dialog>
     </div>
   );
-};
+});
 
 export default LeadManagement;

@@ -15,6 +15,7 @@ export const membersApi = createApi({
     },
   }),
   endpoints: () => ({}),
-  keepUnusedDataFor: 60,
-  refetchOnReconnect: true,
+  keepUnusedDataFor: 300, // 5 minutes cache
+  refetchOnReconnect: false,
+  refetchOnFocus: false,
 });

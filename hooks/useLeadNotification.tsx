@@ -50,7 +50,10 @@ export default function useLeadNotifications() {
     },
     {
       skip: !workspaceId,
-      pollingInterval: 90000,
+      pollingInterval: 0, // Disable polling
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
     }
   );
 

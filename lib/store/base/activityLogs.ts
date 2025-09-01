@@ -22,6 +22,6 @@ export const activityLogsApi = createApi({
   ],
   endpoints: () => ({}),
   keepUnusedDataFor: 300, // 5 minutes cache
-  refetchOnReconnect: true,
+  refetchOnReconnect: false,
   refetchOnFocus: false,
 });

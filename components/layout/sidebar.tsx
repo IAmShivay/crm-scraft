@@ -120,7 +120,12 @@ export function Sidebar({
   );
   const { data: workspaceData }: any = useGetLeadsByWorkspaceQuery(
     { workspaceId: selectedWorkspace.id },
-    { pollingInterval: 2000 }
+    { 
+      pollingInterval: 0, // Disable aggressive polling
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
+    }
   );
 
   const {
@@ -139,7 +144,10 @@ export function Sidebar({
     isLoading: isLoadingStatus,
     error: statusError,
   } = useGetStatusQuery(workspaceId ? Number(workspaceId) : skipToken, {
-    pollingInterval: 2000,
+    pollingInterval: 0, // Disable aggressive polling
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   // **Filter Leads into Contacts**

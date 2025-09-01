@@ -18,6 +18,6 @@ export const webhookApi = createApi({
   tagTypes: ["Webhook", "WebhookSource"],
   endpoints: () => ({}),
   keepUnusedDataFor: 300,
-  refetchOnReconnect: true,
+  refetchOnReconnect: false,
   refetchOnFocus: false,
 });

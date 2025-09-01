@@ -4,7 +4,10 @@ import { formatInTimezone, getCurrentTimeInTimezone } from '@/lib/utils/timezone
 
 export function useWorkspaceSettings() {
   const { data: activeWorkspace, isLoading } = useGetActiveWorkspaceQuery(undefined, {
-    pollingInterval: 300000, // 5 minutes
+    pollingInterval: 0, // Disable polling
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMountOrArgChange: false,
   });
 
   const workspaceData = activeWorkspace?.data;
