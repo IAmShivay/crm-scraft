@@ -137,20 +137,22 @@ export default async function handler(
           // Log logout activity
           logger.debug("Auth API: Logging logout activity");
           try {
-            await ActivityLogger.logActivity({
-              workspace_id: workspaceForLogging.workspace_id.toString(),
-              user_id: userForLogging.id,
-              member_email: userForLogging.email || '',
-              member_name: userForLogging.user_metadata?.name || userForLogging.user_metadata?.firstName,
-              activity_type: 'logout' as any,
-              activity_description: `${userForLogging.email} logged out`,
-              metadata: {
-                workspace_name: (workspaceForLogging.workspaces as any)?.name,
-              },
+            if (workspaceForLogging && userForLogging) {
+              await ActivityLogger.logActivity({
+                workspace_id: workspaceForLogging.workspace_id.toString(),
+                user_id: userForLogging.id,
+                member_email: userForLogging.email || '',
+                member_name: userForLogging.user_metadata?.name || userForLogging.user_metadata?.firstName,
+                activity_type: 'logout' as any,
+                activity_description: `${userForLogging.email} logged out`,
+                metadata: {
+                  workspace_name: (workspaceForLogging.workspaces as any)?.name,
+                },
               ip_address: ActivityLogger.getClientIP(req),
               user_agent: ActivityLogger.getUserAgent(req),
             });
             logger.debug("Auth API: Logout activity logged successfully");
+            }
           } catch (logError) {
             logger.error('Auth API: Failed to log logout activity:', logError);
           }

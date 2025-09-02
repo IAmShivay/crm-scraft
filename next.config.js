@@ -24,16 +24,26 @@ const config = {
     removeConsole: process.env.NODE_ENV === "production",
   },
   experimental: {
-    optimizeCss: true,
-    optimizeServerReact: true,
-    turbo: {
-      rules: {
-        "*.svg": ["@svgr/webpack"],
-      },
-    },
-    // Performance optimizations
+    // Enable faster builds
     webpackBuildWorker: true,
-    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    optimizePackageImports: [
+      '@radix-ui/react-icons', 
+      'lucide-react',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-label',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-tooltip'
+    ],
   },
   // Performance optimizations
   poweredByHeader: false,
